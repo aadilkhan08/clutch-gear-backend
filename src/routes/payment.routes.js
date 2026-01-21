@@ -3,8 +3,15 @@
  */
 const express = require("express");
 const router = express.Router();
-const { paymentController } = require("../controllers");
-const { authenticate, validateObjectId } = require("../middlewares");
+const {
+  paymentController,
+  advancedPaymentController,
+} = require("../controllers");
+const { authenticate, validateObjectId, validate } = require("../middlewares");
+const {
+  refundRequestValidation,
+  listPaymentValidation,
+} = require("../validators");
 
 // Public token-based Razorpay endpoints
 router.get(
@@ -24,6 +31,11 @@ router.post(
   validateObjectId("id"),
   paymentController.createRazorpayOrderForPayment
 );
+router.post(
+  "/:id/razorpay/verify",
+  validateObjectId("id"),
+  paymentController.verifyRazorpayPaymentNativeUser
+);
 router.get(
   "/:id/receipt",
   validateObjectId("id"),
@@ -34,5 +46,20 @@ router.get(
   validateObjectId("jobCardId"),
   paymentController.getJobCardPayments
 );
+
+// Advanced payments (User)
+router.get(
+  "/advanced",
+  listPaymentValidation,
+  validate,
+  advancedPaymentController.listMyPayments
+);
+router.post(
+  "/refunds",
+  refundRequestValidation,
+  validate,
+  advancedPaymentController.requestRefund
+);
+router.get("/refunds", advancedPaymentController.listMyRefunds);
 
 module.exports = router;

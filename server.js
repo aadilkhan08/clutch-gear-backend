@@ -5,6 +5,8 @@
 const app = require("./src/app");
 const config = require("./src/config");
 const { connectDB, getConnectionStatus } = require("./src/config/db");
+const subscriptionService = require("./src/services/subscription.service");
+const serviceScheduleService = require("./src/services/serviceSchedule.service");
 
 // Handle uncaught exceptions
 process.on("uncaughtException", (err) => {
@@ -20,6 +22,11 @@ const startServer = async () => {
     // Connect to MongoDB
     console.log("🔄 Connecting to MongoDB...");
     await connectDB();
+
+    // Initialize subscription cron jobs
+    subscriptionService.initCronJobs();
+    // Initialize service schedule cron jobs
+    serviceScheduleService.initCronJobs();
 
     // Start Express server
     const server = app.listen(config.port, () => {

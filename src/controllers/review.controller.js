@@ -2,7 +2,7 @@
  * Review Controller
  * Handles customer reviews and ratings
  */
-const { Review, JobCard } = require("../models");
+const { Review, JobCard, Garage } = require("../models");
 const { imagekitService } = require("../services");
 const {
   ApiResponse,
@@ -11,6 +11,43 @@ const {
   parsePagination,
   createPaginationMeta,
 } = require("../utils");
+
+const sanitizeText = (value) =>
+  typeof value === "string" ? value.replace(/<[^>]*>/g, "").trim() : value;
+
+const updateGarageRatingSummary = async () => {
+  const garage = await Garage.findOne();
+  if (!garage) return;
+
+  const stats = await Review.aggregate([
+    { $match: { isPublic: true, isVerified: true } },
+    {
+      $group: {
+        _id: null,
+        average: { $avg: "$rating" },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const distributionAgg = await Review.aggregate([
+    { $match: { isPublic: true, isVerified: true } },
+    { $group: { _id: "$rating", count: { $sum: 1 } } },
+  ]);
+
+  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  distributionAgg.forEach((d) => {
+    distribution[d._id] = d.count;
+  });
+
+  const average = stats?.[0]?.average || 0;
+  const count = stats?.[0]?.count || 0;
+
+  garage.ratings.average = Math.round(average * 10) / 10;
+  garage.ratings.count = count;
+  garage.ratings.distribution = distribution;
+  await garage.save();
+};
 
 /**
  * @desc    Get user's reviews
@@ -81,19 +118,21 @@ const createReview = asyncHandler(async (req, res) => {
     customer: req.userId,
     jobCard: jobCardId,
     rating,
-    title,
-    comment,
+    title: sanitizeText(title),
+    comment: sanitizeText(comment),
     serviceQuality,
     timelinessRating,
     valueForMoney,
     staffBehavior,
     wouldRecommend,
     isVerified: true,
+    moderationLogs: [{ action: "CREATED", actor: req.userId }],
   });
 
   await review.populate("jobCard", "jobNumber vehicleSnapshot");
 
   ApiResponse.created(res, "Review submitted successfully", review);
+  updateGarageRatingSummary().catch(() => {});
 });
 
 /**
@@ -123,12 +162,16 @@ const updateReview = asyncHandler(async (req, res) => {
   }
 
   if (rating) review.rating = rating;
-  if (title !== undefined) review.title = title;
-  if (comment !== undefined) review.comment = comment;
+  if (title !== undefined) review.title = sanitizeText(title);
+  if (comment !== undefined) review.comment = sanitizeText(comment);
+
+  review.moderationLogs = review.moderationLogs || [];
+  review.moderationLogs.push({ action: "UPDATED", actor: req.userId });
 
   await review.save();
 
   ApiResponse.success(res, "Review updated successfully", review);
+  updateGarageRatingSummary().catch(() => {});
 });
 
 /**
@@ -147,6 +190,7 @@ const deleteReview = asyncHandler(async (req, res) => {
   }
 
   ApiResponse.success(res, "Review deleted successfully");
+  updateGarageRatingSummary().catch(() => {});
 });
 
 /**
@@ -158,7 +202,7 @@ const getPublicReviews = asyncHandler(async (req, res) => {
   const { page, limit, skip } = parsePagination(req.query);
   const { rating } = req.query;
 
-  const query = { isPublic: true };
+  const query = { isPublic: true, isVerified: true };
   if (rating) {
     query.rating = parseInt(rating, 10);
   }
@@ -174,10 +218,15 @@ const getPublicReviews = asyncHandler(async (req, res) => {
     Review.countDocuments(query),
   ]);
 
+  const mapped = reviews.map((r) => ({
+    ...r,
+    isVisible: r.isPublic,
+  }));
+
   ApiResponse.paginated(
     res,
     "Reviews fetched successfully",
-    reviews,
+    mapped,
     createPaginationMeta(total, page, limit)
   );
 });
@@ -229,10 +278,15 @@ const getAllReviews = asyncHandler(async (req, res) => {
     Review.countDocuments(query),
   ]);
 
+  const mapped = reviews.map((r) => ({
+    ...r,
+    isVisible: r.isPublic,
+  }));
+
   ApiResponse.paginated(
     res,
     "Reviews fetched successfully",
-    reviews,
+    mapped,
     createPaginationMeta(total, page, limit)
   );
 });
@@ -252,10 +306,17 @@ const respondToReview = asyncHandler(async (req, res) => {
   }
 
   review.adminResponse = {
-    response,
+    response: sanitizeText(response),
     respondedAt: new Date(),
     respondedBy: req.userId,
   };
+
+  review.moderationLogs = review.moderationLogs || [];
+  review.moderationLogs.push({
+    action: "RESPONDED",
+    actor: req.userId,
+    remarks: sanitizeText(response),
+  });
 
   await review.save();
 
@@ -275,6 +336,11 @@ const toggleVisibility = asyncHandler(async (req, res) => {
   }
 
   review.isPublic = !review.isPublic;
+  review.moderationLogs = review.moderationLogs || [];
+  review.moderationLogs.push({
+    action: review.isPublic ? "SHOWN" : "HIDDEN",
+    actor: req.userId,
+  });
   await review.save();
 
   ApiResponse.success(
@@ -282,6 +348,7 @@ const toggleVisibility = asyncHandler(async (req, res) => {
     `Review ${review.isPublic ? "published" : "hidden"} successfully`,
     review
   );
+  updateGarageRatingSummary().catch(() => {});
 });
 
 /**

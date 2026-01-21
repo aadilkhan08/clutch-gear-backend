@@ -146,6 +146,13 @@ const jobCardSchema = new mongoose.Schema(
       subtotal: { type: Number, default: 0 },
       discount: { type: Number, default: 0 },
       discountReason: String,
+      coupon: {
+        code: String,
+        couponId: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon" },
+        discountType: String,
+        discountValue: Number,
+        discountAmount: Number,
+      },
       taxRate: { type: Number, default: 18 },
       taxAmount: { type: Number, default: 0 },
       grandTotal: { type: Number, default: 0 },

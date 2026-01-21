@@ -131,7 +131,6 @@ subscriptionSchema.index({ vehicle: 1 });
 subscriptionSchema.index({ package: 1 });
 subscriptionSchema.index({ status: 1 });
 subscriptionSchema.index({ endDate: 1 });
-subscriptionSchema.index({ subscriptionNumber: 1 });
 
 /**
  * Generate subscription number before saving

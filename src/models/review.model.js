@@ -67,6 +67,17 @@ const reviewSchema = new mongoose.Schema(
       respondedAt: Date,
       respondedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     },
+    moderationLogs: [
+      {
+        action: {
+          type: String,
+          enum: ["RESPONDED", "HIDDEN", "SHOWN", "CREATED", "UPDATED"],
+        },
+        actor: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        remarks: String,
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
     isPublic: {
       type: Boolean,
       default: true,
@@ -81,6 +92,7 @@ const reviewSchema = new mongoose.Schema(
     toJSON: {
       transform: (doc, ret) => {
         delete ret.__v;
+        ret.isVisible = ret.isPublic;
         return ret;
       },
     },
@@ -113,7 +125,7 @@ reviewSchema.virtual("averageRating").get(function () {
  */
 reviewSchema.statics.getWorkshopStats = async function () {
   const stats = await this.aggregate([
-    { $match: { isPublic: true } },
+    { $match: { isPublic: true, isVerified: true } },
     {
       $group: {
         _id: null,
@@ -166,7 +178,7 @@ reviewSchema.statics.getWorkshopStats = async function () {
  */
 reviewSchema.statics.getRatingDistribution = async function () {
   const distribution = await this.aggregate([
-    { $match: { isPublic: true } },
+    { $match: { isPublic: true, isVerified: true } },
     {
       $group: {
         _id: "$rating",

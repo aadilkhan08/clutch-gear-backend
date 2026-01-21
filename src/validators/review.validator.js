@@ -18,11 +18,17 @@ const createReviewValidation = [
   body("title")
     .optional()
     .trim()
+    .customSanitizer((value) =>
+      typeof value === "string" ? value.replace(/<[^>]*>/g, "") : value
+    )
     .isLength({ max: 100 })
     .withMessage("Title cannot exceed 100 characters"),
   body("comment")
     .optional()
     .trim()
+    .customSanitizer((value) =>
+      typeof value === "string" ? value.replace(/<[^>]*>/g, "") : value
+    )
     .isLength({ max: 1000 })
     .withMessage("Comment cannot exceed 1000 characters"),
   body("serviceQuality")
@@ -55,11 +61,17 @@ const updateReviewValidation = [
   body("title")
     .optional()
     .trim()
+    .customSanitizer((value) =>
+      typeof value === "string" ? value.replace(/<[^>]*>/g, "") : value
+    )
     .isLength({ max: 100 })
     .withMessage("Title cannot exceed 100 characters"),
   body("comment")
     .optional()
     .trim()
+    .customSanitizer((value) =>
+      typeof value === "string" ? value.replace(/<[^>]*>/g, "") : value
+    )
     .isLength({ max: 1000 })
     .withMessage("Comment cannot exceed 1000 characters"),
 ];
@@ -69,6 +81,9 @@ const adminResponseValidation = [
     .notEmpty()
     .withMessage("Response is required")
     .trim()
+    .customSanitizer((value) =>
+      typeof value === "string" ? value.replace(/<[^>]*>/g, "") : value
+    )
     .isLength({ max: 500 })
     .withMessage("Response cannot exceed 500 characters"),
 ];

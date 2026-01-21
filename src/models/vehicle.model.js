@@ -72,6 +72,30 @@ const vehicleSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    washSubscription: {
+      isActive: {
+        type: Boolean,
+        default: false,
+      },
+      planName: {
+        type: String,
+        trim: true,
+      },
+      startDate: Date,
+      endDate: Date,
+      notes: {
+        type: String,
+        trim: true,
+      },
+    },
+    washZone: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Zone",
+    },
+    washArea: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Area",
+    },
   },
   {
     timestamps: true,

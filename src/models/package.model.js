@@ -127,7 +127,6 @@ packageSchema.index({ type: 1 });
 packageSchema.index({ vehicleTypes: 1 });
 packageSchema.index({ isActive: 1 });
 packageSchema.index({ isPopular: -1, displayOrder: 1 });
-packageSchema.index({ code: 1 });
 
 /**
  * Generate package code before saving

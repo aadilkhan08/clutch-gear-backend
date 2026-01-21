@@ -10,6 +10,7 @@ const TimeSlot = require("./timeslot.model");
 const Appointment = require("./appointment.model");
 const JobCard = require("./jobcard.model");
 const Payment = require("./payment.model");
+const RefundRequest = require("./refundRequest.model");
 const Review = require("./review.model");
 const AdminActivity = require("./adminActivity.model");
 const Enquiry = require("./enquiry.model");
@@ -22,6 +23,12 @@ const Subscription = require("./subscription.model");
 const CarWash = require("./carwash.model");
 const Coupon = require("./coupon.model");
 const Garage = require("./garage.model");
+const InsuranceJob = require("./insuranceJob.model");
+const ServiceSchedule = require("./serviceSchedule.model");
+
+// Car Washing Module
+const Zone = require("./zone.model");
+const Area = require("./area.model");
 
 module.exports = {
   User,
@@ -32,6 +39,7 @@ module.exports = {
   Appointment,
   JobCard,
   Payment,
+  RefundRequest,
   Review,
   AdminActivity,
   Enquiry,
@@ -43,4 +51,9 @@ module.exports = {
   CarWash,
   Coupon,
   Garage,
+  InsuranceJob,
+  ServiceSchedule,
+  // Car Washing
+  Zone,
+  Area,
 };

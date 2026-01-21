@@ -19,7 +19,7 @@ const toUniqueStringIds = (ids = []) => {
 
 const ensureMechanicAssigned = (jobCard, mechanicUserId) => {
   const assignedIds = (jobCard.assignedMechanicUserIds || []).map((id) =>
-    id.toString()
+    id.toString(),
   );
   if (!assignedIds.includes(mechanicUserId.toString())) {
     throw ApiError.forbidden("You are not assigned to this job card");
@@ -100,7 +100,7 @@ const getJobCards = asyncHandler(async (req, res) => {
     res,
     "Job cards fetched successfully",
     jobCards,
-    createPaginationMeta(total, page, limit)
+    createPaginationMeta(total, page, limit),
   );
 });
 
@@ -129,7 +129,7 @@ const getJobCard = asyncHandler(async (req, res) => {
   const balanceDue = Math.max(
     0,
     Math.round((grandTotal - Number(totalPaid || 0) + Number.EPSILON) * 100) /
-      100
+      100,
   );
 
   const data = jobCard.toJSON();
@@ -178,7 +178,7 @@ const approveJobItems = asyncHandler(async (req, res) => {
     await jobCard.updateStatus(
       "approved",
       req.userId,
-      "All items approved by customer"
+      "All items approved by customer",
     );
   }
 
@@ -234,12 +234,14 @@ const getActiveJobCards = asyncHandler(async (req, res) => {
  */
 const getAllJobCards = asyncHandler(async (req, res) => {
   const { page, limit, skip } = parsePagination(req.query);
-  const { status, customerId, vehicleId, dateFrom, dateTo } = req.query;
+  const { status, customerId, vehicleId, mechanicId, dateFrom, dateTo } =
+    req.query;
 
   const query = {};
   if (status) query.status = status;
   if (customerId) query.customer = customerId;
   if (vehicleId) query.vehicle = vehicleId;
+  if (mechanicId) query.assignedMechanicUserIds = mechanicId;
   if (dateFrom || dateTo) {
     query.createdAt = {};
     if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
@@ -261,7 +263,7 @@ const getAllJobCards = asyncHandler(async (req, res) => {
     res,
     "Job cards fetched successfully",
     jobCards,
-    createPaginationMeta(total, page, limit)
+    createPaginationMeta(total, page, limit),
   );
 });
 
@@ -289,7 +291,7 @@ const getJobCardById = asyncHandler(async (req, res) => {
   const balanceDue = Math.max(
     0,
     Math.round((grandTotal - Number(totalPaid || 0) + Number.EPSILON) * 100) /
-      100
+      100,
   );
 
   const data = jobCard.toJSON();
@@ -387,7 +389,7 @@ const createJobCard = asyncHandler(async (req, res) => {
 
     if (mechanics.length !== uniqueIds.length) {
       throw ApiError.badRequest(
-        "One or more mechanicUserIds are invalid or not mechanics"
+        "One or more mechanicUserIds are invalid or not mechanics",
       );
     }
 
@@ -443,7 +445,7 @@ const updateJobCard = asyncHandler(async (req, res) => {
 
   const jobCard = await JobCard.findById(req.params.id).populate(
     "customer",
-    "mobile"
+    "mobile",
   );
 
   if (!jobCard) {
@@ -463,7 +465,7 @@ const updateJobCard = asyncHandler(async (req, res) => {
     if (status === "delivered") {
       if (jobCard.status !== "ready") {
         throw ApiError.badRequest(
-          "Job card must be marked ready before it can be delivered"
+          "Job card must be marked ready before it can be delivered",
         );
       }
 
@@ -474,8 +476,8 @@ const updateJobCard = asyncHandler(async (req, res) => {
       if (balanceDue > 0.01) {
         throw ApiError.badRequest(
           `Cannot mark delivered until payment is completed. Balance due: ₹${balanceDue.toFixed(
-            2
-          )}`
+            2,
+          )}`,
         );
       }
     }
@@ -483,7 +485,7 @@ const updateJobCard = asyncHandler(async (req, res) => {
     await jobCard.updateStatus(
       status,
       req.userId,
-      `Status changed to ${status}`
+      `Status changed to ${status}`,
     );
 
     // Send SMS notification
@@ -500,7 +502,7 @@ const updateJobCard = asyncHandler(async (req, res) => {
     // Send push notification
     try {
       const customer = await User.findById(
-        jobCard.customer._id || jobCard.customer
+        jobCard.customer._id || jobCard.customer,
       )
         .select("deviceInfo")
         .lean();
@@ -548,7 +550,7 @@ const assignMechanics = asyncHandler(async (req, res) => {
 
   if (mechanics.length !== uniqueIds.length) {
     throw ApiError.badRequest(
-      "One or more mechanicUserIds are invalid or not mechanics"
+      "One or more mechanicUserIds are invalid or not mechanics",
     );
   }
 
@@ -605,7 +607,7 @@ const getAssignedJobCards = asyncHandler(async (req, res) => {
     res,
     "Assigned job cards fetched successfully",
     jobCards,
-    createPaginationMeta(total, page, limit)
+    createPaginationMeta(total, page, limit),
   );
 });
 
@@ -632,7 +634,7 @@ const getAssignedJobCard = asyncHandler(async (req, res) => {
   const balanceDue = Math.max(
     0,
     Math.round((grandTotal - Number(totalPaid || 0) + Number.EPSILON) * 100) /
-      100
+      100,
   );
 
   const data = jobCard.toJSON();
@@ -667,7 +669,7 @@ const updateAssignedJobCardStatus = asyncHandler(async (req, res) => {
     if (status === "delivered") {
       if (jobCard.status !== "ready") {
         throw ApiError.badRequest(
-          "Job card must be marked ready before it can be delivered"
+          "Job card must be marked ready before it can be delivered",
         );
       }
 
@@ -678,8 +680,8 @@ const updateAssignedJobCardStatus = asyncHandler(async (req, res) => {
       if (balanceDue > 0.01) {
         throw ApiError.badRequest(
           `Cannot mark delivered until payment is completed. Balance due: ₹${balanceDue.toFixed(
-            2
-          )}`
+            2,
+          )}`,
         );
       }
     }
@@ -715,7 +717,7 @@ const uploadAssignedJobCardImages = asyncHandler(async (req, res) => {
 
   const uploadResults = await imagekitService.uploadMultipleImages(
     req.files,
-    `jobcards/${jobCard._id}/${imageType}`
+    `jobcards/${jobCard._id}/${imageType}`,
   );
 
   const newImages = uploadResults.map((result) => ({
@@ -768,7 +770,7 @@ const addJobItem = asyncHandler(async (req, res) => {
     await jobCard.updateStatus(
       "awaiting-approval",
       req.userId,
-      "New items added for approval"
+      "New items added for approval",
     );
   } else {
     await jobCard.save();
@@ -790,7 +792,7 @@ const removeJobItem = asyncHandler(async (req, res) => {
   }
 
   const itemIndex = jobCard.jobItems.findIndex(
-    (item) => item._id.toString() === req.params.itemId
+    (item) => item._id.toString() === req.params.itemId,
   );
 
   if (itemIndex === -1) {
@@ -855,7 +857,7 @@ const uploadJobCardImages = asyncHandler(async (req, res) => {
   // Upload images
   const uploadResults = await imagekitService.uploadMultipleImages(
     req.files,
-    `jobcards/${jobCard._id}/${imageType}`
+    `jobcards/${jobCard._id}/${imageType}`,
   );
 
   // Add to job card
@@ -897,7 +899,7 @@ const uploadJobCardVideos = asyncHandler(async (req, res) => {
   // Upload videos
   const uploadResults = await imagekitService.uploadMultipleVideos(
     req.files,
-    `jobcards/${jobCard._id}/videos/${videoType}`
+    `jobcards/${jobCard._id}/videos/${videoType}`,
   );
 
   // Initialize videos object if not exists
@@ -952,7 +954,7 @@ const uploadJobCardMedia = asyncHandler(async (req, res) => {
   if (imageFiles.length > 0) {
     const imageResults = await imagekitService.uploadMultipleImages(
       imageFiles,
-      `jobcards/${jobCard._id}/${mediaType}`
+      `jobcards/${jobCard._id}/${mediaType}`,
     );
     results.images = imageResults.map((r) => ({
       url: r.url,
@@ -968,7 +970,7 @@ const uploadJobCardMedia = asyncHandler(async (req, res) => {
     }
     const videoResults = await imagekitService.uploadMultipleVideos(
       videoFiles,
-      `jobcards/${jobCard._id}/videos/${mediaType}`
+      `jobcards/${jobCard._id}/videos/${mediaType}`,
     );
     results.videos = videoResults.map((r) => ({
       url: r.url,

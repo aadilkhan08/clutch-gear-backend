@@ -11,8 +11,14 @@ const {
   appointmentController,
   jobcardController,
   paymentController,
+  advancedPaymentController,
   reviewController,
   enquiryController,
+  packageController,
+  subscriptionController,
+  garageController,
+  couponController,
+  insuranceJobController,
 } = require("../controllers");
 const {
   authenticate,
@@ -31,13 +37,34 @@ const {
   createPaymentValidation,
   updatePaymentValidation,
   refundPaymentValidation,
+  createInvoicePaymentValidation,
+  addTransactionValidation,
+  markPaidValidation,
+  refundRequestValidation,
+  refundActionValidation,
+  listPaymentValidation,
   adminResponseValidation,
+  updateGarageProfileValidation,
+  createCouponValidation,
+  updateCouponValidation,
+  listCouponValidation,
+  createInsuranceJobValidation,
+  updateInsuranceDetailsValidation,
+  updateClaimStatusValidation,
+  uploadDocumentValidation,
+  listInsuranceJobValidation,
   createWalkInCustomerValidation,
   createEnquiryValidation,
   updateEnquiryValidation,
   addFollowUpValidation,
   assignEnquiryValidation,
   convertEnquiryValidation,
+  createPackageValidation,
+  updatePackageValidation,
+  useServiceValidation,
+  activateSubscriptionValidation,
+  cancelSubscriptionValidation,
+  extendSubscriptionValidation,
 } = require("../validators");
 
 // Image upload config
@@ -79,6 +106,23 @@ const mediaUpload = multer({
       cb(null, true);
     } else {
       cb(new Error("Only image and video files are allowed"), false);
+    }
+  },
+});
+
+// Insurance document upload (images + PDF)
+const insuranceDocUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: config.upload.maxImageSize },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      ...config.upload.allowedImageTypes,
+      "application/pdf",
+    ];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image or PDF files are allowed"), false);
     }
   },
 });
@@ -132,6 +176,11 @@ router.get(
 
 // Mechanic role management (admin-controlled)
 router.get("/mechanics", adminController.listMechanics);
+router.get(
+  "/mechanics/:id",
+  validateObjectId("id"),
+  adminController.getMechanic
+);
 router.get("/mechanics/workload", adminController.getAllMechanicsWorkload);
 router.get("/mechanics/workload/all", adminController.getAllMechanicsWorkload);
 router.get(
@@ -272,6 +321,56 @@ router.post(
   validate,
   paymentController.processRefund
 );
+// Advanced Payments
+router.get(
+  "/payments/advanced/dashboard",
+  advancedPaymentController.adminDashboard
+);
+router.get(
+  "/payments/advanced",
+  listPaymentValidation,
+  validate,
+  advancedPaymentController.listAdminPayments
+);
+router.post(
+  "/payments/advanced",
+  createInvoicePaymentValidation,
+  validate,
+  advancedPaymentController.createInvoicePayment
+);
+router.post(
+  "/payments/advanced/:id/transactions",
+  addTransactionValidation,
+  validate,
+  advancedPaymentController.addTransaction
+);
+router.post(
+  "/payments/advanced/:id/mark-paid",
+  markPaidValidation,
+  validate,
+  advancedPaymentController.markPaid
+);
+
+// Refund Requests
+router.get("/refunds", advancedPaymentController.listRefundsAdmin);
+router.put(
+  "/refunds/:id/approve",
+  refundActionValidation,
+  validate,
+  advancedPaymentController.approveRefund
+);
+router.put(
+  "/refunds/:id/reject",
+  refundActionValidation,
+  validate,
+  advancedPaymentController.rejectRefund
+);
+router.put(
+  "/refunds/:id/process",
+  refundActionValidation,
+  validate,
+  advancedPaymentController.processRefund
+);
 // Invoice PDF download
 router.get(
   "/payments/:id/invoice",
@@ -294,6 +393,90 @@ router.put(
   validateObjectId("id"),
   reviewController.toggleVisibility
 );
+
+// Coupons
+router.get(
+  "/coupons",
+  listCouponValidation,
+  validate,
+  couponController.listAdminCoupons
+);
+router.get("/coupons/analytics", couponController.getCouponAnalytics);
+router.post(
+  "/coupons",
+  createCouponValidation,
+  validate,
+  couponController.createCoupon
+);
+router.put(
+  "/coupons/:id",
+  validateObjectId("id"),
+  updateCouponValidation,
+  validate,
+  couponController.updateCoupon
+);
+router.put(
+  "/coupons/:id/toggle",
+  validateObjectId("id"),
+  couponController.toggleCoupon
+);
+
+// Insurance Jobs
+router.get(
+  "/insurance-jobs",
+  listInsuranceJobValidation,
+  validate,
+  insuranceJobController.listAdminInsuranceJobs
+);
+router.post(
+  "/insurance-jobs",
+  createInsuranceJobValidation,
+  validate,
+  insuranceJobController.createInsuranceJob
+);
+router.get(
+  "/insurance-jobs/:id",
+  validateObjectId("id"),
+  insuranceJobController.getAdminInsuranceJob
+);
+router.put(
+  "/insurance-jobs/:id",
+  validateObjectId("id"),
+  updateInsuranceDetailsValidation,
+  validate,
+  insuranceJobController.updateInsuranceDetails
+);
+router.put(
+  "/insurance-jobs/:id/status",
+  validateObjectId("id"),
+  updateClaimStatusValidation,
+  validate,
+  insuranceJobController.updateClaimStatus
+);
+router.post(
+  "/insurance-jobs/:id/documents",
+  validateObjectId("id"),
+  insuranceDocUpload.single("document"),
+  uploadDocumentValidation,
+  validate,
+  insuranceJobController.uploadDocument
+);
+router.delete(
+  "/insurance-jobs/:id/documents/:docId",
+  validateObjectId("id"),
+  validateObjectId("docId"),
+  insuranceJobController.deleteDocument
+);
+
+// Garage Profile
+router.get("/garage/profile", garageController.getAdminProfile);
+router.put(
+  "/garage/profile",
+  updateGarageProfileValidation,
+  validate,
+  garageController.updateProfile
+);
+router.post("/garage/ratings/recalculate", garageController.recalculateRatings);
 
 // ============ Enquiry/Lead Management ============
 router.get("/enquiries/stats", enquiryController.getEnquiryStats);
@@ -341,6 +524,82 @@ router.delete(
   "/enquiries/:id",
   validateObjectId("id"),
   enquiryController.deleteEnquiry
+);
+
+// ============ Package Management ============
+router.get("/packages/stats", packageController.getPackageStats);
+router.get("/packages", packageController.getAllPackages);
+router.get(
+  "/packages/:id",
+  validateObjectId("id"),
+  packageController.getPackageById
+);
+router.post(
+  "/packages",
+  createPackageValidation,
+  validate,
+  packageController.createPackage
+);
+router.put(
+  "/packages/:id",
+  validateObjectId("id"),
+  updatePackageValidation,
+  validate,
+  packageController.updatePackage
+);
+router.put(
+  "/packages/:id/toggle-status",
+  validateObjectId("id"),
+  packageController.togglePackageStatus
+);
+router.delete(
+  "/packages/:id",
+  validateObjectId("id"),
+  packageController.deletePackage
+);
+
+// ============ Subscription Management ============
+router.get(
+  "/subscriptions/reports/usage",
+  subscriptionController.getUsageReport
+);
+router.post(
+  "/subscriptions/expire-check",
+  subscriptionController.expireSubscriptions
+);
+router.get("/subscriptions", subscriptionController.getAllSubscriptions);
+router.get(
+  "/subscriptions/:id",
+  validateObjectId("id"),
+  subscriptionController.getSubscriptionDetails
+);
+router.post(
+  "/subscriptions/:id/activate",
+  validateObjectId("id"),
+  activateSubscriptionValidation,
+  validate,
+  subscriptionController.activateSubscription
+);
+router.post(
+  "/subscriptions/:id/cancel",
+  validateObjectId("id"),
+  cancelSubscriptionValidation,
+  validate,
+  subscriptionController.cancelSubscription
+);
+router.post(
+  "/subscriptions/:id/extend",
+  validateObjectId("id"),
+  extendSubscriptionValidation,
+  validate,
+  subscriptionController.extendSubscription
+);
+router.post(
+  "/subscriptions/:id/use-service",
+  validateObjectId("id"),
+  useServiceValidation,
+  validate,
+  subscriptionController.useSubscriptionService
 );
 
 module.exports = router;

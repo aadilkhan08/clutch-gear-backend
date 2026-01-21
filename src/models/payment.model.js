@@ -20,6 +20,45 @@ const paymentSchema = new mongoose.Schema(
       ref: "User",
       required: [true, "Customer is required"],
     },
+    invoiceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "JobCard",
+    },
+    totalAmount: {
+      type: Number,
+      min: [0, "Total amount cannot be negative"],
+    },
+    paidAmount: {
+      type: Number,
+      min: [0, "Paid amount cannot be negative"],
+      default: 0,
+    },
+    balanceAmount: {
+      type: Number,
+      min: [0, "Balance amount cannot be negative"],
+      default: 0,
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["PARTIAL", "PAID", "REFUND_PENDING", "REFUNDED"],
+      default: "PARTIAL",
+    },
+    transactions: [
+      {
+        transactionId: String,
+        amount: {
+          type: Number,
+          min: [0, "Transaction amount cannot be negative"],
+          required: true,
+        },
+        method: {
+          type: String,
+          enum: ["UPI", "CARD", "CASH", "RAZORPAY"],
+          required: true,
+        },
+        paidAt: { type: Date, default: Date.now },
+      },
+    ],
     amount: {
       type: Number,
       required: [true, "Amount is required"],
@@ -85,8 +124,10 @@ const paymentSchema = new mongoose.Schema(
 paymentSchema.index({ jobCard: 1 });
 paymentSchema.index({ customer: 1 });
 paymentSchema.index({ status: 1 });
+paymentSchema.index({ paymentStatus: 1 });
 paymentSchema.index({ createdAt: -1 });
 paymentSchema.index({ transactionId: 1 });
+paymentSchema.index({ invoiceId: 1 });
 
 /**
  * Generate payment number before saving

@@ -84,6 +84,7 @@ const garageSchema = new mongoose.Schema(
       website: String,
       googleMaps: String,
     },
+    servicesOffered: [String],
     businessHours: [
       {
         day: {
@@ -260,7 +261,6 @@ const garageSchema = new mongoose.Schema(
 );
 
 // Indexes
-garageSchema.index({ slug: 1 });
 garageSchema.index({ "address.city": 1 });
 garageSchema.index({ "address.pincode": 1 });
 garageSchema.index({ "address.coordinates": "2dsphere" });

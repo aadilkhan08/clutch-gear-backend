@@ -40,10 +40,19 @@ const carWashSchema = new mongoose.Schema(
     },
     completedAt: Date,
     zone: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Zone",
+    },
+    area: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Area",
+    },
+    // Legacy string fields for backward compatibility
+    zoneName: {
       type: String,
       trim: true,
     },
-    area: {
+    areaName: {
       type: String,
       trim: true,
     },
@@ -115,7 +124,6 @@ const carWashSchema = new mongoose.Schema(
 );
 
 // Indexes
-carWashSchema.index({ vehicle: 1, date: 1 });
 carWashSchema.index({ customer: 1, date: -1 });
 carWashSchema.index({ subscription: 1 });
 carWashSchema.index({ date: 1, status: 1 });

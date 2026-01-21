@@ -559,6 +559,87 @@ const verifyRazorpayPaymentNative = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Verify Razorpay signature for native SDK (User flow)
+ * @route   POST /api/v1/payments/:id/razorpay/verify
+ * @access  Private
+ */
+const verifyRazorpayPaymentNativeUser = asyncHandler(async (req, res) => {
+  const { razorpay_payment_id, razorpay_order_id, razorpay_signature } =
+    req.body || {};
+
+  if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
+    throw ApiError.badRequest("Missing Razorpay verification fields");
+  }
+
+  // Ensure user owns this payment
+  const payment = await Payment.findOne({
+    _id: req.params.id,
+    customer: req.userId,
+  }).populate("jobCard");
+
+  if (!payment) {
+    throw ApiError.notFound("Payment not found");
+  }
+
+  if (payment.status !== "pending") {
+    throw ApiError.badRequest("Payment is not pending");
+  }
+
+  const expectedOrderId = payment.transactionDetails?.orderId;
+  if (!expectedOrderId || expectedOrderId !== razorpay_order_id) {
+    throw ApiError.badRequest("Order ID mismatch");
+  }
+
+  const secret = process.env.RAZORPAY_KEY_SECRET;
+  if (!secret) {
+    throw ApiError.serviceUnavailable(
+      "Razorpay is not configured on the server"
+    );
+  }
+
+  const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+  const expectedSignature = crypto
+    .createHmac("sha256", secret)
+    .update(body)
+    .digest("hex");
+
+  if (expectedSignature !== razorpay_signature) {
+    throw ApiError.badRequest("Invalid payment signature");
+  }
+
+  payment.status = "completed";
+  payment.transactionId = razorpay_payment_id;
+  payment.transactionDetails = {
+    ...(payment.transactionDetails || {}),
+    gateway: "razorpay",
+    orderId: razorpay_order_id,
+    signature: razorpay_signature,
+  };
+  payment.checkout = undefined;
+  await payment.save();
+
+  ApiResponse.success(res, "Payment verified and completed", {
+    payment: {
+      _id: payment._id,
+      paymentNumber: payment.paymentNumber,
+      amount: payment.amount,
+      status: payment.status,
+      transactionId: payment.transactionId,
+      paymentMethod: payment.paymentMethod,
+      paymentType: payment.paymentType,
+      jobCard: payment.jobCard
+        ? {
+            _id: payment.jobCard._id,
+            jobNumber: payment.jobCard.jobNumber,
+            vehicleSnapshot: payment.jobCard.vehicleSnapshot,
+          }
+        : null,
+      createdAt: payment.createdAt,
+    },
+  });
+});
+
 // ============ Admin Controllers ============
 
 /**
@@ -917,6 +998,7 @@ module.exports = {
   createRazorpayOrderForPayment,
   renderRazorpayCheckout,
   verifyRazorpayPayment,
+  verifyRazorpayPaymentNativeUser,
   // Admin
   getAllPayments,
   createRazorpayOrderForPaymentAdmin,

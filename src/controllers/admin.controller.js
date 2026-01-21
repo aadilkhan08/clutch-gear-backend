@@ -408,6 +408,27 @@ const listMechanics = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Get mechanic details (Admin)
+ * @route   GET /api/v1/admin/mechanics/:id
+ * @access  Private/Admin
+ */
+const getMechanic = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const mechanic = await User.findOne({ _id: id, role: "mechanic" })
+    .select(
+      "name mobile email role isActive isVerified isProfileComplete profileImage address createdAt"
+    )
+    .lean();
+
+  if (!mechanic) {
+    throw ApiError.notFound("Mechanic not found");
+  }
+
+  ApiResponse.success(res, "Mechanic fetched successfully", mechanic);
+});
+
+/**
  * @desc    Create admin user (Admin)
  * @route   POST /api/v1/admin/users/admin
  * @access  Private/Admin
@@ -855,6 +876,7 @@ module.exports = {
   updateUserRole,
   getAllCustomers,
   listMechanics,
+  getMechanic,
   createAdminUser,
   getTimeSlots,
   upsertTimeSlot,
