@@ -23,6 +23,7 @@ const subscriptionController = require("./subscription.controller");
 const washingController = require("./washing.controller");
 const serviceScheduleController = require("./serviceSchedule.controller");
 const advancedPaymentController = require("./advancedPayment.controller");
+const invoiceController = require("./invoice.controller");
 
 module.exports = {
   authController,
@@ -46,4 +47,5 @@ module.exports = {
   washingController,
   serviceScheduleController,
   advancedPaymentController,
+  invoiceController,
 };

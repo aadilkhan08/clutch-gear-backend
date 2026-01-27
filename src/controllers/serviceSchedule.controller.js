@@ -430,34 +430,137 @@ exports.listMySchedules = async (req, res) => {
     const filter = { customerId: req.userId, isActive: true };
     if (status) filter.status = status;
 
+    const now = new Date();
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 59, 999);
+
     if (type === "upcoming") {
-      const now = new Date();
-      const endOfDay = new Date(now);
-      endOfDay.setHours(23, 59, 59, 999);
+      filter.status = "PENDING";
       filter.$or = [
-        { scheduleType: "ONE_TIME", scheduledDate: { $gt: endOfDay } },
-        { scheduleType: "PERIODIC", nextServiceDate: { $gt: endOfDay } },
+        { scheduleType: "ONE_TIME", scheduledDate: { $gte: startOfDay } },
+        { scheduleType: "PERIODIC", nextServiceDate: { $gte: startOfDay } },
+      ];
+    } else if (type === "completed") {
+      filter.status = "COMPLETED";
+    } else if (type === "overdue") {
+      filter.status = "PENDING";
+      filter.$or = [
+        { scheduleType: "ONE_TIME", scheduledDate: { $lt: startOfDay } },
+        { scheduleType: "PERIODIC", nextServiceDate: { $lt: startOfDay } },
       ];
     }
 
     const schedules = await ServiceSchedule.find(filter)
-      .populate("vehicleId", "vehicleNumber brand model")
+      .populate("vehicleId", "vehicleNumber brand model color vehicleType")
       .sort({ nextServiceDate: 1, scheduledDate: 1 })
       .lean();
+
+    // Calculate additional fields for customer display
+    const enrichedSchedules = schedules.map((schedule) => {
+      const effectiveDate =
+        schedule.scheduleType === "PERIODIC"
+          ? schedule.nextServiceDate
+          : schedule.scheduledDate;
+      const effectiveDateObj = new Date(effectiveDate);
+
+      // Determine if overdue
+      const isOverdue =
+        schedule.status === "PENDING" && effectiveDateObj < startOfDay;
+
+      // Determine if today
+      const isToday =
+        effectiveDateObj >= startOfDay && effectiveDateObj <= endOfDay;
+
+      // Days until/since
+      const diffTime = effectiveDateObj.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      return {
+        ...schedule,
+        effectiveDate,
+        isOverdue,
+        isToday,
+        daysUntil: diffDays,
+      };
+    });
 
     res.json({
       success: true,
       message: "Schedules fetched",
-      data: { schedules },
+      data: { schedules: enrichedSchedules },
     });
   } catch (error) {
     console.error("List my schedules error:", error);
-    res
-      .status(500)
-      .json({
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch schedules",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Get schedule by ID (Customer - read-only)
+ * Ensures customer can only view their own schedules
+ */
+exports.getMyScheduleById = async (req, res) => {
+  try {
+    const schedule = await ServiceSchedule.findOne({
+      _id: req.params.id,
+      customerId: req.userId,
+      isActive: true,
+    })
+      .populate("vehicleId", "vehicleNumber brand model color vehicleType")
+      .lean();
+
+    if (!schedule) {
+      return res.status(404).json({
         success: false,
-        message: "Failed to fetch schedules",
-        error: error.message,
+        message: "Schedule not found",
       });
+    }
+
+    // Calculate additional fields
+    const now = new Date();
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const effectiveDate =
+      schedule.scheduleType === "PERIODIC"
+        ? schedule.nextServiceDate
+        : schedule.scheduledDate;
+    const effectiveDateObj = new Date(effectiveDate);
+
+    const isOverdue =
+      schedule.status === "PENDING" && effectiveDateObj < startOfDay;
+    const isToday =
+      effectiveDateObj >= startOfDay && effectiveDateObj <= endOfDay;
+    const diffTime = effectiveDateObj.getTime() - now.getTime();
+    const daysUntil = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    res.json({
+      success: true,
+      message: "Schedule fetched",
+      data: {
+        schedule: {
+          ...schedule,
+          effectiveDate,
+          isOverdue,
+          isToday,
+          daysUntil,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get my schedule error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch schedule",
+      error: error.message,
+    });
   }
 };

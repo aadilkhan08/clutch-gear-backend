@@ -14,10 +14,10 @@ const {
 const STATUS_ORDER = [
   "INITIATED",
   "DOCUMENTS_UPLOADED",
+  "SURVEY_DONE",
   "APPROVED",
   "REJECTED",
-  "SETTLED",
-];
+  "SETTLED",];
 
 const canTransition = (current, next) => {
   if (current === next) return true;

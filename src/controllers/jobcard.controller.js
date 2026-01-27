@@ -3,7 +3,7 @@
  * Handles job card management
  */
 const { JobCard, Vehicle, Appointment, User, Payment } = require("../models");
-const { smsService, imagekitService, fcmService } = require("../services");
+const { smsService, imagekitService, fcmService, notificationService } = require("../services");
 const {
   ApiResponse,
   ApiError,
@@ -223,6 +223,340 @@ const getActiveJobCards = asyncHandler(async (req, res) => {
     .lean();
 
   ApiResponse.success(res, "Active job cards fetched successfully", jobCards);
+});
+
+/**
+ * @desc    Get inspection media for a job card (Customer)
+ * @route   GET /api/v1/jobcards/:id/inspection-media
+ * @access  Private
+ */
+const getInspectionMedia = asyncHandler(async (req, res) => {
+  const jobCard = await JobCard.findOne({
+    _id: req.params.id,
+    customer: req.userId,
+  }).select("jobNumber diagnostics images videos status createdAt");
+
+  if (!jobCard) {
+    throw ApiError.notFound("Job card not found");
+  }
+
+  // Organize media by category
+  const media = {
+    jobNumber: jobCard.jobNumber,
+    status: jobCard.status,
+    categories: [],
+  };
+
+  // Diagnostics Images
+  if (jobCard.diagnostics?.images?.length > 0) {
+    media.categories.push({
+      id: "diagnostics",
+      name: "Diagnostic Findings",
+      type: "images",
+      items: jobCard.diagnostics.images.map((img, idx) => ({
+        id: `diag-${idx}`,
+        type: "image",
+        url: img.url,
+        fileId: img.fileId,
+        caption: img.caption || "Diagnostic image",
+        thumbnailUrl: img.url ? `${img.url}?tr=w-200,h-200,fo-auto` : null,
+      })),
+    });
+  }
+
+  // Before Service Images
+  if (jobCard.images?.beforeService?.length > 0) {
+    media.categories.push({
+      id: "before-service",
+      name: "Before Service",
+      type: "images",
+      items: jobCard.images.beforeService.map((img, idx) => ({
+        id: `before-${idx}`,
+        type: "image",
+        url: img.url,
+        fileId: img.fileId,
+        caption: img.caption || "Before service",
+        thumbnailUrl: img.url ? `${img.url}?tr=w-200,h-200,fo-auto` : null,
+      })),
+    });
+  }
+
+  // After Service Images
+  if (jobCard.images?.afterService?.length > 0) {
+    media.categories.push({
+      id: "after-service",
+      name: "After Service",
+      type: "images",
+      items: jobCard.images.afterService.map((img, idx) => ({
+        id: `after-${idx}`,
+        type: "image",
+        url: img.url,
+        fileId: img.fileId,
+        caption: img.caption || "After service",
+        thumbnailUrl: img.url ? `${img.url}?tr=w-200,h-200,fo-auto` : null,
+      })),
+    });
+  }
+
+  // Inspection Videos
+  if (jobCard.videos?.inspection?.length > 0) {
+    media.categories.push({
+      id: "inspection-videos",
+      name: "Inspection Videos",
+      type: "videos",
+      items: jobCard.videos.inspection.map((vid, idx) => ({
+        id: `insp-vid-${idx}`,
+        type: "video",
+        url: vid.url,
+        fileId: vid.fileId,
+        thumbnailUrl: vid.thumbnailUrl,
+        caption: vid.caption || "Inspection video",
+        duration: vid.duration,
+      })),
+    });
+  }
+
+  // Repair Videos
+  if (jobCard.videos?.repair?.length > 0) {
+    media.categories.push({
+      id: "repair-videos",
+      name: "Repair Videos",
+      type: "videos",
+      items: jobCard.videos.repair.map((vid, idx) => ({
+        id: `repair-vid-${idx}`,
+        type: "video",
+        url: vid.url,
+        fileId: vid.fileId,
+        thumbnailUrl: vid.thumbnailUrl,
+        caption: vid.caption || "Repair video",
+        duration: vid.duration,
+      })),
+    });
+  }
+
+  // Summary counts
+  media.summary = {
+    totalImages: media.categories
+      .filter((c) => c.type === "images")
+      .reduce((sum, c) => sum + c.items.length, 0),
+    totalVideos: media.categories
+      .filter((c) => c.type === "videos")
+      .reduce((sum, c) => sum + c.items.length, 0),
+    lastUpdated: jobCard.updatedAt || jobCard.createdAt,
+  };
+
+  ApiResponse.success(res, "Inspection media fetched successfully", media);
+});
+
+/**
+ * @desc    Get estimate for a job card (Customer)
+ * @route   GET /api/v1/jobcards/:id/estimate
+ * @access  Private
+ */
+const getEstimate = asyncHandler(async (req, res) => {
+  const jobCard = await JobCard.findOne({
+    _id: req.params.id,
+    customer: req.userId,
+  })
+    .select("jobNumber estimate vehicleSnapshot status createdAt")
+    .populate("estimate.createdBy", "name");
+
+  if (!jobCard) {
+    throw ApiError.notFound("Job card not found");
+  }
+
+  if (!jobCard.estimate) {
+    throw ApiError.notFound("No estimate available for this job card");
+  }
+
+  const estimate = {
+    jobNumber: jobCard.jobNumber,
+    jobCardId: jobCard._id,
+    jobCardStatus: jobCard.status,
+    vehicleInfo: jobCard.vehicleSnapshot,
+    ...jobCard.estimate.toObject(),
+    canApprove:
+      jobCard.estimate.status === "PENDING_APPROVAL" &&
+      ["inspection", "awaiting-approval"].includes(jobCard.status),
+    canReject:
+      jobCard.estimate.status === "PENDING_APPROVAL" &&
+      ["inspection", "awaiting-approval"].includes(jobCard.status),
+  };
+
+  ApiResponse.success(res, "Estimate fetched successfully", estimate);
+});
+
+/**
+ * @desc    Approve estimate (Customer)
+ * @route   POST /api/v1/jobcards/:id/estimate/approve
+ * @access  Private
+ */
+const approveEstimate = asyncHandler(async (req, res) => {
+  const jobCard = await JobCard.findOne({
+    _id: req.params.id,
+    customer: req.userId,
+  }).populate("customer", "name mobile deviceInfo");
+
+  if (!jobCard) {
+    throw ApiError.notFound("Job card not found");
+  }
+
+  if (!jobCard.estimate) {
+    throw ApiError.notFound("No estimate available for this job card");
+  }
+
+  // Check if estimate can be approved
+  if (jobCard.estimate.status !== "PENDING_APPROVAL") {
+    throw ApiError.badRequest(
+      `Estimate has already been ${jobCard.estimate.status.toLowerCase()}`
+    );
+  }
+
+  // Check if job card is in correct status
+  if (!["inspection", "awaiting-approval"].includes(jobCard.status)) {
+    throw ApiError.badRequest(
+      "Cannot approve estimate at this stage of the job"
+    );
+  }
+
+  // Check if estimate has expired
+  if (jobCard.estimate.expiresAt && new Date() > jobCard.estimate.expiresAt) {
+    throw ApiError.badRequest(
+      "This estimate has expired. Please request a new estimate."
+    );
+  }
+
+  // Approve the estimate
+  jobCard.estimate.status = "APPROVED";
+  jobCard.estimate.approvedAt = new Date();
+  jobCard.estimate.approvedBy = req.userId;
+
+  // Update job card status to approved
+  await jobCard.updateStatus(req.userId, "Customer approved cost estimate");
+  jobCard.status = "approved";
+
+  // Copy estimate to billing for actual invoicing
+  if (jobCard.estimate.grandTotal > 0) {
+    jobCard.billing.subtotal = jobCard.estimate.subtotal;
+    jobCard.billing.discount = jobCard.estimate.discountAmount || 0;
+    jobCard.billing.discountReason = jobCard.estimate.discountReason || "";
+    jobCard.billing.taxRate = jobCard.estimate.taxRate;
+    jobCard.billing.taxAmount = jobCard.estimate.taxAmount;
+    jobCard.billing.grandTotal = jobCard.estimate.grandTotal;
+  }
+
+  await jobCard.save();
+
+  // Notify admins about approval
+  try {
+    const admins = await User.find({
+      role: { $in: ["admin", "superadmin"] },
+      "deviceInfo.fcmToken": { $exists: true },
+    }).select("deviceInfo.fcmToken");
+
+    const adminTokens = admins
+      .map((a) => a.deviceInfo?.fcmToken)
+      .filter(Boolean);
+    if (adminTokens.length > 0) {
+      await fcmService.notifyAdminApproval(adminTokens, jobCard);
+    }
+  } catch (error) {
+    console.error("Failed to notify admins:", error.message);
+  }
+
+  ApiResponse.success(res, "Estimate approved successfully", {
+    jobNumber: jobCard.jobNumber,
+    estimateStatus: jobCard.estimate.status,
+    jobCardStatus: jobCard.status,
+    approvedAt: jobCard.estimate.approvedAt,
+    grandTotal: jobCard.estimate.grandTotal,
+  });
+});
+
+/**
+ * @desc    Reject estimate (Customer)
+ * @route   POST /api/v1/jobcards/:id/estimate/reject
+ * @access  Private
+ */
+const rejectEstimate = asyncHandler(async (req, res) => {
+  const { reason } = req.body;
+
+  const jobCard = await JobCard.findOne({
+    _id: req.params.id,
+    customer: req.userId,
+  }).populate("customer", "name mobile deviceInfo");
+
+  if (!jobCard) {
+    throw ApiError.notFound("Job card not found");
+  }
+
+  if (!jobCard.estimate) {
+    throw ApiError.notFound("No estimate available for this job card");
+  }
+
+  // Check if estimate can be rejected
+  if (jobCard.estimate.status !== "PENDING_APPROVAL") {
+    throw ApiError.badRequest(
+      `Estimate has already been ${jobCard.estimate.status.toLowerCase()}`
+    );
+  }
+
+  // Check if job card is in correct status
+  if (!["inspection", "awaiting-approval"].includes(jobCard.status)) {
+    throw ApiError.badRequest(
+      "Cannot reject estimate at this stage of the job"
+    );
+  }
+
+  // Reject the estimate
+  jobCard.estimate.status = "REJECTED";
+  jobCard.estimate.rejectedAt = new Date();
+  jobCard.estimate.rejectedBy = req.userId;
+  jobCard.estimate.rejectionReason = reason || "";
+
+  // Add to estimate history for tracking
+  if (!jobCard.estimateHistory) {
+    jobCard.estimateHistory = [];
+  }
+  jobCard.estimateHistory.push({
+    ...jobCard.estimate.toObject(),
+  });
+
+  await jobCard.save();
+
+  // Notify admins about rejection
+  try {
+    const admins = await User.find({
+      role: { $in: ["admin", "superadmin"] },
+      "deviceInfo.fcmToken": { $exists: true },
+    }).select("deviceInfo.fcmToken");
+
+    const adminTokens = admins
+      .map((a) => a.deviceInfo?.fcmToken)
+      .filter(Boolean);
+    if (adminTokens.length > 0) {
+      await fcmService.sendToMultipleDevices(
+        adminTokens,
+        {
+          title: "Estimate Rejected",
+          body: `Job ${jobCard.jobNumber}: Customer rejected the estimate${reason ? ` - "${reason}"` : ""}`,
+        },
+        {
+          type: "ESTIMATE_REJECTED",
+          jobCardId: jobCard._id.toString(),
+        }
+      );
+    }
+  } catch (error) {
+    console.error("Failed to notify admins:", error.message);
+  }
+
+  ApiResponse.success(res, "Estimate rejected successfully", {
+    jobNumber: jobCard.jobNumber,
+    estimateStatus: jobCard.estimate.status,
+    rejectedAt: jobCard.estimate.rejectedAt,
+    rejectionReason: jobCard.estimate.rejectionReason,
+  });
 });
 
 // ============ Admin Controllers ============
@@ -488,34 +822,17 @@ const updateJobCard = asyncHandler(async (req, res) => {
       `Status changed to ${status}`,
     );
 
-    // Send SMS notification
+    // Send notification to customer (handles push + SMS based on preferences)
     try {
-      await smsService.sendJobStatusUpdate(jobCard.customer.mobile, {
-        jobNumber: jobCard.jobNumber,
-        status: status.replace(/-/g, " "),
-        vehicleNumber: jobCard.vehicleSnapshot.vehicleNumber,
-      });
-    } catch (error) {
-      console.error("SMS notification failed:", error);
-    }
+      const customerId = jobCard.customer._id || jobCard.customer;
+      await notificationService.sendStatusUpdate(customerId, jobCard, status);
 
-    // Send push notification
-    try {
-      const customer = await User.findById(
-        jobCard.customer._id || jobCard.customer,
-      )
-        .select("deviceInfo")
-        .lean();
-      if (customer) {
-        await fcmService.notifyJobStatusUpdate(customer, jobCard, status);
-
-        // Special notification for vehicle ready
-        if (status === "ready") {
-          await fcmService.notifyVehicleReady(customer, jobCard);
-        }
+      // Special notification for vehicle ready
+      if (status === "ready") {
+        await notificationService.sendVehicleReady(customerId, jobCard);
       }
     } catch (error) {
-      console.error("Push notification failed:", error);
+      console.error("Customer notification failed:", error);
     }
   } else {
     await jobCard.save();
@@ -576,6 +893,135 @@ const assignMechanics = asyncHandler(async (req, res) => {
     assignedMechanicUserIds: jobCard.assignedMechanicUserIds,
     assignedMechanics: jobCard.assignedMechanics,
   });
+});
+
+/**
+ * @desc    Create or update estimate for a job card (Admin)
+ * @route   PUT /api/v1/admin/jobcards/:id/estimate
+ * @access  Private/Admin
+ */
+const createOrUpdateEstimate = asyncHandler(async (req, res) => {
+  const {
+    items,
+    discountAmount,
+    discountReason,
+    taxRate,
+    notes,
+    expiresAt,
+  } = req.body;
+
+  const jobCard = await JobCard.findById(req.params.id).populate(
+    "customer",
+    "name mobile deviceInfo"
+  );
+
+  if (!jobCard) {
+    throw ApiError.notFound("Job card not found");
+  }
+
+  // Cannot modify approved estimate
+  if (jobCard.estimate?.status === "APPROVED") {
+    throw ApiError.badRequest(
+      "Cannot modify an approved estimate. Create a supplementary estimate instead."
+    );
+  }
+
+  // Check valid job card status for estimates
+  if (["delivered", "cancelled"].includes(jobCard.status)) {
+    throw ApiError.badRequest(
+      "Cannot create estimate for completed or cancelled jobs"
+    );
+  }
+
+  // Calculate estimate totals
+  const normalizedItems = (items || []).map((item) => {
+    const quantity = Math.max(1, Number(item.quantity || 1));
+    const unitPrice = Math.max(0, Number(item.unitPrice || 0));
+    const discountPct = Math.min(Math.max(Number(item.discount || 0), 0), 100);
+    const lineTotal = quantity * unitPrice;
+    const discountAmt = (lineTotal * discountPct) / 100;
+    const total = round2(Math.max(0, lineTotal - discountAmt));
+
+    return {
+      type: item.type || "service",
+      name: item.name,
+      description: item.description || "",
+      quantity,
+      unitPrice,
+      discount: discountPct,
+      total,
+    };
+  });
+
+  const subtotal = round2(
+    normalizedItems.reduce((sum, item) => sum + item.total, 0)
+  );
+  const discount = Math.max(0, Number(discountAmount || 0));
+  const afterDiscount = Math.max(0, subtotal - discount);
+  const tax = Number.isFinite(Number(taxRate)) ? Number(taxRate) : 18;
+  const taxAmount = round2((afterDiscount * tax) / 100);
+  const grandTotal = round2(afterDiscount + taxAmount);
+
+  // Save previous estimate to history if it exists and was rejected
+  if (jobCard.estimate?.status === "REJECTED") {
+    if (!jobCard.estimateHistory) {
+      jobCard.estimateHistory = [];
+    }
+    // Already saved to history during rejection
+  }
+
+  // Determine version
+  const newVersion = (jobCard.estimate?.version || 0) + 1;
+  const isRevision = Boolean(jobCard.estimate);
+
+  // Create/update estimate
+  jobCard.estimate = {
+    version: newVersion,
+    status: "PENDING_APPROVAL",
+    items: normalizedItems,
+    subtotal,
+    discountAmount: discount,
+    discountReason: discountReason || "",
+    taxRate: tax,
+    taxAmount,
+    grandTotal,
+    notes: notes || "",
+    createdBy: req.userId,
+    createdAt: new Date(),
+    expiresAt: expiresAt ? new Date(expiresAt) : null,
+    notificationSentAt: null,
+  };
+
+  // Update job card status to awaiting-approval
+  if (jobCard.status === "created" || jobCard.status === "inspection") {
+    await jobCard.updateStatus(
+      req.userId,
+      isRevision ? "Revised estimate sent to customer" : "Estimate sent to customer"
+    );
+    jobCard.status = "awaiting-approval";
+  }
+
+  await jobCard.save();
+
+  // Send notification to customer about estimate
+  try {
+    const customerId = jobCard.customer._id || jobCard.customer;
+    await notificationService.sendEstimateApproval(customerId, jobCard, grandTotal);
+    jobCard.estimate.notificationSentAt = new Date();
+    await jobCard.save();
+  } catch (error) {
+    console.error("Failed to send estimate notification:", error.message);
+  }
+
+  ApiResponse.success(
+    res,
+    isRevision ? "Estimate revised successfully" : "Estimate created successfully",
+    {
+      jobNumber: jobCard.jobNumber,
+      estimate: jobCard.estimate,
+      jobCardStatus: jobCard.status,
+    }
+  );
 });
 
 // ============ Mechanic Controllers ============
@@ -1022,12 +1468,17 @@ module.exports = {
   approveJobItems,
   getJobCardHistory,
   getActiveJobCards,
+  getInspectionMedia,
+  getEstimate,
+  approveEstimate,
+  rejectEstimate,
   // Admin
   getAllJobCards,
   getJobCardById,
   createJobCard,
   updateJobCard,
   assignMechanics,
+  createOrUpdateEstimate,
   addJobItem,
   removeJobItem,
   updateBilling,

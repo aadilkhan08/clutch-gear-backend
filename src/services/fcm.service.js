@@ -414,6 +414,28 @@ const notifyNewAppointment = async (adminTokens, appointment) => {
   );
 };
 
+/**
+ * Notify admin about rescheduled appointment
+ */
+const notifyAppointmentRescheduled = async (adminTokens, appointment, previousSchedule) => {
+  if (!adminTokens || adminTokens.length === 0) return null;
+
+  const prevDate = new Date(previousSchedule.date).toLocaleDateString("en-IN");
+  const newDate = new Date(appointment.scheduledDate).toLocaleDateString("en-IN");
+
+  return sendToMultipleDevices(
+    adminTokens,
+    {
+      title: "Appointment Rescheduled",
+      body: `Appointment ${appointment.appointmentNumber} rescheduled from ${prevDate} to ${newDate}`,
+    },
+    {
+      type: "APPOINTMENT_RESCHEDULED",
+      appointmentId: appointment._id.toString(),
+    }
+  );
+};
+
 module.exports = {
   sendToDevice,
   sendToMultipleDevices,
@@ -429,4 +451,5 @@ module.exports = {
   notifyPaymentReceived,
   notifyAppointmentReminder,
   notifyNewAppointment,
+  notifyAppointmentRescheduled,
 };

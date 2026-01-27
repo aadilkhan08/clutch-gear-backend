@@ -90,6 +90,30 @@ const appointmentSchema = new mongoose.Schema(
     cancelledAt: Date,
     confirmedAt: Date,
     completedAt: Date,
+    rescheduleHistory: [
+      {
+        date: Date,
+        timeSlot: {
+          startTime: String,
+          endTime: String,
+        },
+        rescheduledAt: Date,
+        reason: String,
+      },
+    ],
+    // Track which reminders have been sent
+    reminders: {
+      sent24h: {
+        type: Boolean,
+        default: false,
+      },
+      sent2h: {
+        type: Boolean,
+        default: false,
+      },
+      sentAt24h: Date,
+      sentAt2h: Date,
+    },
   },
   {
     timestamps: true,

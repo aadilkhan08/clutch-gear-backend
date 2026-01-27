@@ -2,6 +2,7 @@
  * Service Controller
  * Handles workshop services management
  */
+const NodeCache = require("node-cache");
 const { Service } = require("../models");
 const { imagekitService } = require("../services");
 const {
@@ -12,6 +13,19 @@ const {
   createPaginationMeta,
   parseFilters,
 } = require("../utils");
+
+const SERVICE_CACHE_TTL_SECONDS = 300;
+const serviceCache = new NodeCache({
+  stdTTL: SERVICE_CACHE_TTL_SECONDS,
+  checkperiod: 60,
+  useClones: false,
+});
+
+const SERVICE_LIST_FIELDS =
+  "name description category vehicleTypes basePrice estimatedDuration image isPopular displayOrder";
+
+const buildCacheKey = (prefix, payload) =>
+  `${prefix}:${JSON.stringify(payload)}`;
 
 /**
  * @desc    Get all services (public)
@@ -36,14 +50,34 @@ const getServices = asyncHandler(async (req, res) => {
     query.$text = { $search: search };
   }
 
+  const cacheKey = buildCacheKey("services:list", {
+    page,
+    limit,
+    category: category || null,
+    vehicleType: vehicleType || null,
+    search: search || null,
+  });
+  const cached = serviceCache.get(cacheKey);
+  if (cached) {
+    return ApiResponse.paginated(
+      res,
+      "Services fetched successfully",
+      cached.services,
+      createPaginationMeta(cached.total, page, limit)
+    );
+  }
+
   const [services, total] = await Promise.all([
     Service.find(query)
+      .select(SERVICE_LIST_FIELDS)
       .sort({ isPopular: -1, displayOrder: 1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
     Service.countDocuments(query),
   ]);
+
+  serviceCache.set(cacheKey, { services, total });
 
   ApiResponse.paginated(
     res,
@@ -105,13 +139,26 @@ const getServicesAdmin = asyncHandler(async (req, res) => {
 const getPopularServices = asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit, 10) || 6;
 
+  const cacheKey = buildCacheKey("services:popular", { limit });
+  const cached = serviceCache.get(cacheKey);
+  if (cached) {
+    return ApiResponse.success(
+      res,
+      "Popular services fetched successfully",
+      cached
+    );
+  }
+
   const services = await Service.find({
     isActive: true,
     isPopular: true,
   })
+    .select(SERVICE_LIST_FIELDS)
     .sort({ displayOrder: 1 })
     .limit(limit)
     .lean();
+
+  serviceCache.set(cacheKey, services);
 
   ApiResponse.success(res, "Popular services fetched successfully", services);
 });
@@ -127,14 +174,32 @@ const getServicesByCategory = asyncHandler(async (req, res) => {
 
   const query = { isActive: true, category };
 
+  const cacheKey = buildCacheKey("services:category", {
+    category,
+    page,
+    limit,
+  });
+  const cached = serviceCache.get(cacheKey);
+  if (cached) {
+    return ApiResponse.paginated(
+      res,
+      "Services fetched successfully",
+      cached.services,
+      createPaginationMeta(cached.total, page, limit)
+    );
+  }
+
   const [services, total] = await Promise.all([
     Service.find(query)
+      .select(SERVICE_LIST_FIELDS)
       .sort({ displayOrder: 1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
     Service.countDocuments(query),
   ]);
+
+  serviceCache.set(cacheKey, { services, total });
 
   ApiResponse.paginated(
     res,
@@ -150,11 +215,24 @@ const getServicesByCategory = asyncHandler(async (req, res) => {
  * @access  Public
  */
 const getService = asyncHandler(async (req, res) => {
-  const service = await Service.findById(req.params.id);
+  const isAdmin = ["admin", "superadmin"].includes(req.userRole);
 
-  if (!service) {
+  const cacheKey = buildCacheKey("services:detail", {
+    id: req.params.id,
+    scope: isAdmin ? "admin" : "customer",
+  });
+  const cached = serviceCache.get(cacheKey);
+  if (cached) {
+    return ApiResponse.success(res, "Service fetched successfully", cached);
+  }
+
+  const service = await Service.findById(req.params.id).select("-__v").lean();
+
+  if (!service || (!service.isActive && !isAdmin)) {
     throw ApiError.notFound("Service not found");
   }
+
+  serviceCache.set(cacheKey, service);
 
   ApiResponse.success(res, "Service fetched successfully", service);
 });
@@ -190,6 +268,8 @@ const createService = asyncHandler(async (req, res) => {
     isPopular,
     displayOrder,
   });
+
+  serviceCache.flushAll();
 
   ApiResponse.created(res, "Service created successfully", service);
 });
@@ -230,6 +310,8 @@ const updateService = asyncHandler(async (req, res) => {
   if (!service) {
     throw ApiError.notFound("Service not found");
   }
+
+  serviceCache.flushAll();
 
   ApiResponse.success(res, "Service updated successfully", service);
 });
@@ -272,6 +354,8 @@ const updateServiceImage = asyncHandler(async (req, res) => {
   };
   await service.save();
 
+  serviceCache.flushAll();
+
   ApiResponse.success(res, "Service image updated successfully", {
     image: service.image,
   });
@@ -293,6 +377,8 @@ const deleteService = asyncHandler(async (req, res) => {
     throw ApiError.notFound("Service not found");
   }
 
+  serviceCache.flushAll();
+
   ApiResponse.success(res, "Service deleted successfully");
 });
 
@@ -302,6 +388,12 @@ const deleteService = asyncHandler(async (req, res) => {
  * @access  Public
  */
 const getCategories = asyncHandler(async (req, res) => {
+  const cacheKey = "services:categories";
+  const cached = serviceCache.get(cacheKey);
+  if (cached) {
+    return ApiResponse.success(res, "Categories fetched successfully", cached);
+  }
+
   const categories = await Service.aggregate([
     { $match: { isActive: true } },
     {
@@ -312,6 +404,8 @@ const getCategories = asyncHandler(async (req, res) => {
     },
     { $sort: { count: -1 } },
   ]);
+
+  serviceCache.set(cacheKey, categories);
 
   ApiResponse.success(res, "Categories fetched successfully", categories);
 });

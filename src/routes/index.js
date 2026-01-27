@@ -24,8 +24,11 @@ const inventoryRoutes = require("./inventory.routes");
 const packageRoutes = require("./package.routes");
 const subscriptionRoutes = require("./subscription.routes");
 const washingRoutes = require("./washing.routes");
+const washingUserRoutes = require("./washing.user.routes");
 const serviceScheduleRoutes = require("./serviceSchedule.routes");
 const serviceScheduleUserRoutes = require("./serviceSchedule.user.routes");
+const invoiceRoutes = require("./invoice.routes");
+const notificationRoutes = require("./notification.routes");
 
 // Health check
 router.get("/health", (req, res) => {
@@ -52,11 +55,14 @@ router.use("/upload", uploadRoutes);
 router.use("/admin", adminRoutes);
 router.use("/admin/inventory", inventoryRoutes);
 router.use("/admin/washing", washingRoutes);
+router.use("/washing", washingUserRoutes);
 router.use("/admin/service-schedules", serviceScheduleRoutes);
 router.use("/superadmin", superadminRoutes);
 router.use("/mechanic", mechanicRoutes);
 router.use("/packages", packageRoutes);
 router.use("/subscriptions", subscriptionRoutes);
 router.use("/service-schedules", serviceScheduleUserRoutes);
+router.use("/invoices", invoiceRoutes);
+router.use("/notifications", notificationRoutes);
 
 module.exports = router;

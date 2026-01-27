@@ -56,26 +56,48 @@ const buildProfileResponse = (garage) => {
     _id: garage?._id,
     garageName: garage?.name || "",
     description: garage?.description || "",
+    tagline: garage?.tagline || "",
+    logo: garage?.logo?.url || "",
     address: {
       line1: garage?.address?.street || "",
+      landmark: garage?.address?.landmark || "",
       city: garage?.address?.city || "",
       state: garage?.address?.state || "",
       pincode: garage?.address?.pincode || "",
+      coordinates: {
+        lat: garage?.address?.coordinates?.lat || null,
+        lng: garage?.address?.coordinates?.lng || null,
+      },
     },
     contact: {
       phone: garage?.contact?.phone || "",
+      alternatePhone: garage?.contact?.alternatePhone || "",
       email: garage?.contact?.email || "",
+      whatsapp: garage?.contact?.whatsapp || "",
     },
     workingHours,
     servicesOffered: garage?.servicesOffered || [],
+    specialities: garage?.specialities || [],
+    facilities: garage?.facilities || [],
     socialLinks: {
       googleMaps: garage?.social?.googleMaps || "",
       instagram: garage?.social?.instagram || "",
+      facebook: garage?.social?.facebook || "",
+      youtube: garage?.social?.youtube || "",
+      twitter: garage?.social?.twitter || "",
       website: garage?.social?.website || "",
     },
     ratingSummary: {
       averageRating: garage?.ratings?.average || 0,
       totalReviews: garage?.ratings?.count || 0,
+      distribution: garage?.ratings?.distribution || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    },
+    stats: {
+      totalCustomers: garage?.stats?.totalCustomers || 0,
+      totalVehiclesServiced: garage?.stats?.totalVehiclesServiced || 0,
+      yearsInBusiness: garage?.stats?.yearsInBusiness || garage?.establishedYear 
+        ? new Date().getFullYear() - garage.establishedYear 
+        : 0,
     },
     openStatus: {
       isOpenNow: garage?.isOpenNow ? garage.isOpenNow() : false,
@@ -89,6 +111,8 @@ const buildProfileResponse = (garage) => {
         : null,
     },
     isActive: garage?.isActive ?? false,
+    isVerified: garage?.isVerified ?? false,
+    establishedYear: garage?.establishedYear || null,
     updatedAt: garage?.updatedAt || garage?.createdAt || null,
   };
 };

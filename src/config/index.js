@@ -86,9 +86,11 @@ const config = {
 
   // OTP
   otp: {
-    expiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES, 10) || 5,
+    expiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES, 10) || 2,
     length: parseInt(process.env.OTP_LENGTH, 10) || 6,
     maxAttempts: parseInt(process.env.OTP_MAX_ATTEMPTS, 10) || 3,
+    resendCooldownSeconds:
+      parseInt(process.env.OTP_RESEND_COOLDOWN_SECONDS, 10) || 60,
   },
 
   // SMS

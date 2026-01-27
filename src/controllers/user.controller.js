@@ -36,6 +36,10 @@ const getProfile = asyncHandler(async (req, res) => {
  * @access  Private
  */
 const updateProfile = asyncHandler(async (req, res) => {
+  if (req.body?.mobile !== undefined) {
+    throw ApiError.badRequest("Mobile number cannot be updated");
+  }
+
   const { name, email, address, isProfileComplete } = req.body;
 
   const updateData = sanitizeObject({

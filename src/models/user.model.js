@@ -68,6 +68,18 @@ const userSchema = new mongoose.Schema(
       deviceId: String,
       deviceType: String,
       fcmToken: String,
+      fcmTokenUpdatedAt: Date,
+    },
+    // Notification preferences
+    notificationPreferences: {
+      pushEnabled: { type: Boolean, default: true },
+      smsEnabled: { type: Boolean, default: true },
+      remindersEnabled: { type: Boolean, default: true },
+      // Granular controls
+      bookingAlerts: { type: Boolean, default: true },
+      statusUpdates: { type: Boolean, default: true },
+      paymentAlerts: { type: Boolean, default: true },
+      promotions: { type: Boolean, default: false },
     },
   },
   {

@@ -21,6 +21,15 @@ router.get("/stats", reviewController.getWorkshopStats);
 
 // Protected routes
 router.get("/", authenticate, reviewController.getMyReviews);
+
+// Get review by job card ID (check if review exists)
+router.get(
+  "/job/:jobCardId",
+  authenticate,
+  validateObjectId("jobCardId"),
+  reviewController.getReviewByJobCard
+);
+
 router.post(
   "/",
   authenticate,

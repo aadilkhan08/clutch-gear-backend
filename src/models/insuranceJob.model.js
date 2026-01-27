@@ -66,6 +66,7 @@ const insuranceJobSchema = new mongoose.Schema(
       enum: [
         "INITIATED",
         "DOCUMENTS_UPLOADED",
+        "SURVEY_DONE",
         "APPROVED",
         "REJECTED",
         "SETTLED",

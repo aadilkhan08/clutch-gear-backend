@@ -4,6 +4,122 @@
  */
 const mongoose = require("mongoose");
 
+// Estimate item schema for cost breakdown
+const estimateItemSchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      enum: ["service", "part", "labour", "consumable", "external"],
+      required: true,
+    },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
+    quantity: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+    unitPrice: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    discount: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+    total: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+  },
+  { _id: true }
+);
+
+// Estimate schema for cost estimation & approval
+const estimateSchema = new mongoose.Schema(
+  {
+    version: {
+      type: Number,
+      default: 1,
+    },
+    status: {
+      type: String,
+      enum: ["PENDING_APPROVAL", "APPROVED", "REJECTED"],
+      default: "PENDING_APPROVAL",
+    },
+    items: [estimateItemSchema],
+    subtotal: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    discountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    discountReason: {
+      type: String,
+      trim: true,
+    },
+    taxRate: {
+      type: Number,
+      default: 18,
+      min: 0,
+    },
+    taxAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    grandTotal: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    notes: {
+      type: String,
+      trim: true,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+    approvedAt: Date,
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    rejectedAt: Date,
+    rejectedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    rejectionReason: {
+      type: String,
+      trim: true,
+    },
+    expiresAt: Date,
+    notificationSentAt: Date,
+  },
+  { _id: true }
+);
+
 const jobItemSchema = new mongoose.Schema(
   {
     type: {
@@ -157,6 +273,10 @@ const jobCardSchema = new mongoose.Schema(
       taxAmount: { type: Number, default: 0 },
       grandTotal: { type: Number, default: 0 },
     },
+    // Cost Estimate for customer approval
+    estimate: estimateSchema,
+    // Estimate history for tracking revisions
+    estimateHistory: [estimateSchema],
     notes: {
       internal: String,
       customer: String,

@@ -7,6 +7,7 @@ const config = require("./src/config");
 const { connectDB, getConnectionStatus } = require("./src/config/db");
 const subscriptionService = require("./src/services/subscription.service");
 const serviceScheduleService = require("./src/services/serviceSchedule.service");
+const notificationScheduler = require("./src/services/notificationScheduler.service");
 
 // Handle uncaught exceptions
 process.on("uncaughtException", (err) => {
@@ -27,6 +28,8 @@ const startServer = async () => {
     subscriptionService.initCronJobs();
     // Initialize service schedule cron jobs
     serviceScheduleService.initCronJobs();
+    // Initialize notification scheduler cron jobs
+    notificationScheduler.initializeScheduler();
 
     // Start Express server
     const server = app.listen(config.port, () => {

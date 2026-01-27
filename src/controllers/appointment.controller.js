@@ -3,7 +3,7 @@
  * Handles appointment booking and management
  */
 const { Appointment, Vehicle, Service, TimeSlot, User } = require("../models");
-const { smsService, fcmService } = require("../services");
+const { smsService, fcmService, notificationService } = require("../services");
 const {
   ApiResponse,
   ApiError,
@@ -41,7 +41,7 @@ const getAppointments = asyncHandler(async (req, res) => {
     res,
     "Appointments fetched successfully",
     appointments,
-    createPaginationMeta(total, page, limit)
+    createPaginationMeta(total, page, limit),
   );
 });
 
@@ -131,6 +131,27 @@ const createAppointment = asyncHandler(async (req, res) => {
     throw ApiError.badRequest("This time slot is fully booked");
   }
 
+  let resolvedPickupAddress = pickupAddress;
+
+  if (pickupRequired) {
+    if (!resolvedPickupAddress) {
+      const user = await User.findById(req.userId).select("address");
+      resolvedPickupAddress = user?.address || undefined;
+    }
+
+    const missingAddressFields = ["street", "city", "state", "pincode"].filter(
+      (field) =>
+        !resolvedPickupAddress?.[field] ||
+        !String(resolvedPickupAddress[field]).trim(),
+    );
+
+    if (missingAddressFields.length) {
+      throw ApiError.badRequest(
+        "Pickup address is required. Please update your profile address.",
+      );
+    }
+  }
+
   // Create appointment
   const appointment = await Appointment.create({
     customer: req.userId,
@@ -140,7 +161,7 @@ const createAppointment = asyncHandler(async (req, res) => {
     timeSlot,
     customerNotes,
     pickupRequired,
-    pickupAddress: pickupRequired ? pickupAddress : undefined,
+    pickupAddress: pickupRequired ? resolvedPickupAddress : undefined,
     estimatedCost: appointmentServices.reduce((sum, s) => sum + s.price, 0),
   });
 
@@ -148,6 +169,13 @@ const createAppointment = asyncHandler(async (req, res) => {
     { path: "vehicle", select: "vehicleNumber brand model" },
     { path: "services.service", select: "name" },
   ]);
+
+  // Send booking confirmation to customer
+  try {
+    await notificationService.sendBookingConfirmation(req.userId, appointment);
+  } catch (error) {
+    console.error("Customer notification failed:", error);
+  }
 
   // Notify admins about new appointment
   try {
@@ -192,6 +220,106 @@ const cancelAppointment = asyncHandler(async (req, res) => {
   await appointment.save();
 
   ApiResponse.success(res, "Appointment cancelled successfully", appointment);
+});
+
+/**
+ * @desc    Reschedule appointment
+ * @route   PUT /api/v1/appointments/:id/reschedule
+ * @access  Private
+ */
+const rescheduleAppointment = asyncHandler(async (req, res) => {
+  const { scheduledDate, timeSlot, reason } = req.body;
+
+  // Find the appointment
+  const appointment = await Appointment.findOne({
+    _id: req.params.id,
+    customer: req.userId,
+    status: { $in: ["pending", "confirmed"] },
+  }).populate("vehicle", "vehicleNumber brand model");
+
+  if (!appointment) {
+    throw ApiError.notFound("Appointment not found or cannot be rescheduled");
+  }
+
+  // Validate new date is not in the past
+  const newDate = new Date(scheduledDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (newDate < today) {
+    throw ApiError.badRequest("Cannot reschedule to a past date");
+  }
+
+  // Check if the new slot has availability
+  const dayOfWeek = newDate.getDay();
+  const slot = await TimeSlot.findOne({
+    dayOfWeek,
+    startTime: timeSlot.startTime,
+    isActive: true,
+  });
+
+  if (!slot) {
+    throw ApiError.badRequest("Selected time slot is not available");
+  }
+
+  // Count existing bookings for the new slot (excluding this appointment)
+  const existingBookings = await Appointment.countDocuments({
+    _id: { $ne: appointment._id },
+    scheduledDate: {
+      $gte: new Date(newDate).setHours(0, 0, 0, 0),
+      $lt: new Date(newDate).setHours(23, 59, 59, 999),
+    },
+    "timeSlot.startTime": timeSlot.startTime,
+    status: { $nin: ["cancelled", "no-show"] },
+  });
+
+  if (existingBookings >= slot.maxBookings) {
+    throw ApiError.badRequest("This time slot is fully booked");
+  }
+
+  // Store previous schedule for history
+  const previousSchedule = {
+    date: appointment.scheduledDate,
+    timeSlot: { ...appointment.timeSlot },
+    rescheduledAt: new Date(),
+    reason: reason || "Customer requested",
+  };
+
+  // Initialize rescheduleHistory if not exists
+  if (!appointment.rescheduleHistory) {
+    appointment.rescheduleHistory = [];
+  }
+  appointment.rescheduleHistory.push(previousSchedule);
+
+  // Update the appointment
+  appointment.scheduledDate = scheduledDate;
+  appointment.timeSlot = timeSlot;
+  appointment.status = "pending"; // Reset to pending for re-confirmation
+
+  await appointment.save();
+
+  await appointment.populate("services.service", "name basePrice");
+
+  // Notify admins about rescheduled appointment
+  try {
+    const admins = await User.find({ role: "admin", isActive: true })
+      .select("deviceInfo")
+      .lean();
+    const adminTokens = admins
+      .filter((a) => a.deviceInfo?.fcmToken)
+      .map((a) => a.deviceInfo.fcmToken);
+    if (adminTokens.length > 0) {
+      await fcmService.notifyAppointmentRescheduled(
+        adminTokens,
+        appointment,
+        previousSchedule,
+      );
+    }
+  } catch (error) {
+    console.error("Push notification to admins failed:", error);
+  }
+
+  ApiResponse.success(res, "Appointment rescheduled successfully", appointment);
 });
 
 /**
@@ -250,7 +378,7 @@ const getAvailableSlots = asyncHandler(async (req, res) => {
   ApiResponse.success(
     res,
     "Available slots fetched successfully",
-    availableSlots
+    availableSlots,
   );
 });
 
@@ -274,7 +402,7 @@ const getUpcomingAppointments = asyncHandler(async (req, res) => {
   ApiResponse.success(
     res,
     "Upcoming appointments fetched successfully",
-    appointments
+    appointments,
   );
 });
 
@@ -316,7 +444,7 @@ const getAllAppointments = asyncHandler(async (req, res) => {
     res,
     "Appointments fetched successfully",
     appointments,
-    createPaginationMeta(total, page, limit)
+    createPaginationMeta(total, page, limit),
   );
 });
 
@@ -349,7 +477,7 @@ const updateAppointment = asyncHandler(async (req, res) => {
             date: new Date(appointment.scheduledDate).toLocaleDateString(),
             time: appointment.timeSlot.startTime,
             vehicleNumber: appointment.vehicle.vehicleNumber,
-          }
+          },
         );
       } catch (error) {
         console.error("SMS notification failed:", error);
@@ -396,8 +524,26 @@ const getTodayAppointments = asyncHandler(async (req, res) => {
   ApiResponse.success(
     res,
     "Today's appointments fetched successfully",
-    appointments
+    appointments,
   );
+});
+
+/**
+ * @desc    Get single appointment (Admin)
+ * @route   GET /api/v1/admin/appointments/:id
+ * @access  Private/Admin
+ */
+const getAdminAppointment = asyncHandler(async (req, res) => {
+  const appointment = await Appointment.findById(req.params.id)
+    .populate("customer", "name mobile email")
+    .populate("vehicle")
+    .populate("services.service");
+
+  if (!appointment) {
+    throw ApiError.notFound("Appointment not found");
+  }
+
+  ApiResponse.success(res, "Appointment fetched successfully", appointment);
 });
 
 module.exports = {
@@ -406,10 +552,12 @@ module.exports = {
   getAppointment,
   createAppointment,
   cancelAppointment,
+  rescheduleAppointment,
   getAvailableSlots,
   getUpcomingAppointments,
   // Admin
   getAllAppointments,
+  getAdminAppointment,
   updateAppointment,
   getTodayAppointments,
 };

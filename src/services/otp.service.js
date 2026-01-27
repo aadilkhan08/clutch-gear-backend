@@ -10,10 +10,10 @@ const smsService = require("./sms.service");
  */
 const generateAndSendOTP = async (mobile, purpose = "login") => {
   // Generate OTP
-  const otpDoc = await OTP.generateOTP(mobile, purpose);
+  const { otpDoc, otp } = await OTP.generateOTP(mobile, purpose);
 
   // Send OTP via SMS
-  await smsService.sendOTP(mobile, otpDoc.otp);
+  await smsService.sendOTP(mobile, otp);
 
   return {
     success: true,

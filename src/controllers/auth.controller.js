@@ -3,6 +3,7 @@
  * Handles authentication operations
  */
 const { User } = require("../models");
+const config = require("../config");
 const { otpService } = require("../services");
 const { ApiResponse, ApiError, asyncHandler } = require("../utils");
 
@@ -18,7 +19,13 @@ const sendOTP = asyncHandler(async (req, res) => {
   const result = await otpService.generateAndSendOTP(mobile, "login");
 
   ApiResponse.success(res, result.message, {
+    mobile,
     expiresAt: result.expiresAt,
+    expiresInSeconds: Math.max(
+      0,
+      Math.ceil((new Date(result.expiresAt).getTime() - Date.now()) / 1000)
+    ),
+    resendAfterSeconds: Math.max(1, config.otp.resendCooldownSeconds),
   });
 });
 
@@ -141,7 +148,13 @@ const resendOTP = asyncHandler(async (req, res) => {
   const result = await otpService.resendOTP(mobile, "login");
 
   ApiResponse.success(res, result.message, {
+    mobile,
     expiresAt: result.expiresAt,
+    expiresInSeconds: Math.max(
+      0,
+      Math.ceil((new Date(result.expiresAt).getTime() - Date.now()) / 1000)
+    ),
+    resendAfterSeconds: Math.max(1, config.otp.resendCooldownSeconds),
   });
 });
 

@@ -8,6 +8,7 @@ const { authenticate, validate, validateObjectId } = require("../middlewares");
 const {
   createAppointmentValidation,
   cancelAppointmentValidation,
+  rescheduleAppointmentValidation,
 } = require("../validators");
 
 // All routes require authentication
@@ -34,6 +35,13 @@ router.put(
   cancelAppointmentValidation,
   validate,
   appointmentController.cancelAppointment
+);
+router.put(
+  "/:id/reschedule",
+  validateObjectId("id"),
+  rescheduleAppointmentValidation,
+  validate,
+  appointmentController.rescheduleAppointment
 );
 
 module.exports = router;

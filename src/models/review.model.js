@@ -4,6 +4,13 @@
  */
 const mongoose = require("mongoose");
 
+// Review status enum
+const REVIEW_STATUS = {
+  PENDING: "PENDING",
+  APPROVED: "APPROVED",
+  HIDDEN: "HIDDEN",
+};
+
 const reviewSchema = new mongoose.Schema(
   {
     customer: {
@@ -15,6 +22,11 @@ const reviewSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "JobCard",
       required: [true, "Job card is required"],
+    },
+    // Keeping garageId for future multi-garage support
+    garage: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Garage",
     },
     rating: {
       type: Number,
@@ -31,6 +43,12 @@ const reviewSchema = new mongoose.Schema(
       type: String,
       trim: true,
       maxlength: [1000, "Comment cannot exceed 1000 characters"],
+    },
+    // Review moderation status
+    status: {
+      type: String,
+      enum: Object.values(REVIEW_STATUS),
+      default: REVIEW_STATUS.PENDING,
     },
     serviceQuality: {
       type: Number,
@@ -71,13 +89,22 @@ const reviewSchema = new mongoose.Schema(
       {
         action: {
           type: String,
-          enum: ["RESPONDED", "HIDDEN", "SHOWN", "CREATED", "UPDATED"],
+          enum: [
+            "RESPONDED",
+            "HIDDEN",
+            "SHOWN",
+            "CREATED",
+            "UPDATED",
+            "APPROVED",
+            "PENDING",
+          ],
         },
         actor: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         remarks: String,
         createdAt: { type: Date, default: Date.now },
       },
     ],
+    // Legacy fields kept for backward compatibility
     isPublic: {
       type: Boolean,
       default: true,
@@ -92,7 +119,8 @@ const reviewSchema = new mongoose.Schema(
     toJSON: {
       transform: (doc, ret) => {
         delete ret.__v;
-        ret.isVisible = ret.isPublic;
+        // Compute isVisible from status
+        ret.isVisible = ret.status === "APPROVED" || ret.isPublic;
         return ret;
       },
     },
@@ -103,7 +131,9 @@ const reviewSchema = new mongoose.Schema(
 reviewSchema.index({ customer: 1, jobCard: 1 }, { unique: true });
 reviewSchema.index({ rating: -1 });
 reviewSchema.index({ isPublic: 1, isVerified: 1 });
+reviewSchema.index({ status: 1 });
 reviewSchema.index({ createdAt: -1 });
+reviewSchema.index({ jobCard: 1 }); // For quick lookup by jobCard
 
 /**
  * Calculate average rating
@@ -122,10 +152,18 @@ reviewSchema.virtual("averageRating").get(function () {
 
 /**
  * Get workshop statistics
+ * Uses status: APPROVED for filtering approved reviews
  */
 reviewSchema.statics.getWorkshopStats = async function () {
   const stats = await this.aggregate([
-    { $match: { isPublic: true, isVerified: true } },
+    {
+      $match: {
+        $or: [
+          { status: "APPROVED" },
+          { isPublic: true, isVerified: true }, // Legacy fallback
+        ],
+      },
+    },
     {
       $group: {
         _id: null,
@@ -178,7 +216,14 @@ reviewSchema.statics.getWorkshopStats = async function () {
  */
 reviewSchema.statics.getRatingDistribution = async function () {
   const distribution = await this.aggregate([
-    { $match: { isPublic: true, isVerified: true } },
+    {
+      $match: {
+        $or: [
+          { status: "APPROVED" },
+          { isPublic: true, isVerified: true }, // Legacy fallback
+        ],
+      },
+    },
     {
       $group: {
         _id: "$rating",
@@ -196,8 +241,21 @@ reviewSchema.statics.getRatingDistribution = async function () {
   return result;
 };
 
+/**
+ * Get review by job card ID
+ */
+reviewSchema.statics.getByJobCard = async function (jobCardId, customerId) {
+  return this.findOne({
+    jobCard: jobCardId,
+    customer: customerId,
+  }).lean();
+};
+
 reviewSchema.set("toJSON", { virtuals: true });
 
 const Review = mongoose.model("Review", reviewSchema);
+
+// Export status enum for use in controllers
+Review.REVIEW_STATUS = REVIEW_STATUS;
 
 module.exports = Review;

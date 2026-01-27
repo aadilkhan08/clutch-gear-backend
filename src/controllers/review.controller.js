@@ -20,7 +20,14 @@ const updateGarageRatingSummary = async () => {
   if (!garage) return;
 
   const stats = await Review.aggregate([
-    { $match: { isPublic: true, isVerified: true } },
+    {
+      $match: {
+        $or: [
+          { status: "APPROVED" },
+          { isPublic: true, isVerified: true }, // Legacy fallback
+        ],
+      },
+    },
     {
       $group: {
         _id: null,
@@ -31,7 +38,14 @@ const updateGarageRatingSummary = async () => {
   ]);
 
   const distributionAgg = await Review.aggregate([
-    { $match: { isPublic: true, isVerified: true } },
+    {
+      $match: {
+        $or: [
+          { status: "APPROVED" },
+          { isPublic: true, isVerified: true }, // Legacy fallback
+        ],
+      },
+    },
     { $group: { _id: "$rating", count: { $sum: 1 } } },
   ]);
 
@@ -73,6 +87,48 @@ const getMyReviews = asyncHandler(async (req, res) => {
     reviews,
     createPaginationMeta(total, page, limit)
   );
+});
+
+/**
+ * @desc    Get review by job card ID (check if review exists)
+ * @route   GET /api/v1/reviews/job/:jobCardId
+ * @access  Private
+ */
+const getReviewByJobCard = asyncHandler(async (req, res) => {
+  const { jobCardId } = req.params;
+
+  const review = await Review.findOne({
+    jobCard: jobCardId,
+    customer: req.userId,
+  })
+    .populate("jobCard", "jobNumber vehicleSnapshot status")
+    .lean();
+
+  if (!review) {
+    // Check if job card exists and is eligible for review
+    const jobCard = await JobCard.findOne({
+      _id: jobCardId,
+      customer: req.userId,
+    })
+      .select("status jobNumber vehicleSnapshot")
+      .lean();
+
+    if (!jobCard) {
+      throw ApiError.notFound("Job card not found");
+    }
+
+    return ApiResponse.success(res, "No review found for this job card", {
+      review: null,
+      jobCard,
+      canReview: jobCard.status === "delivered",
+    });
+  }
+
+  ApiResponse.success(res, "Review found", {
+    review,
+    jobCard: review.jobCard,
+    canReview: false,
+  });
 });
 
 /**
@@ -125,7 +181,11 @@ const createReview = asyncHandler(async (req, res) => {
     valueForMoney,
     staffBehavior,
     wouldRecommend,
+    // New reviews start as APPROVED by default (auto-approval)
+    // Admin can hide inappropriate reviews later
+    status: "APPROVED",
     isVerified: true,
+    isPublic: true,
     moderationLogs: [{ action: "CREATED", actor: req.userId }],
   });
 
@@ -200,18 +260,32 @@ const deleteReview = asyncHandler(async (req, res) => {
  */
 const getPublicReviews = asyncHandler(async (req, res) => {
   const { page, limit, skip } = parsePagination(req.query);
-  const { rating } = req.query;
+  const { rating, sort } = req.query;
 
-  const query = { isPublic: true, isVerified: true };
+  // Query for approved reviews (status or legacy fields)
+  const query = {
+    $or: [
+      { status: "APPROVED" },
+      { isPublic: true, isVerified: true }, // Legacy fallback
+    ],
+  };
   if (rating) {
     query.rating = parseInt(rating, 10);
+  }
+
+  // Determine sort order
+  let sortOrder = { createdAt: -1 };
+  if (sort === "highest") {
+    sortOrder = { rating: -1, createdAt: -1 };
+  } else if (sort === "lowest") {
+    sortOrder = { rating: 1, createdAt: -1 };
   }
 
   const [reviews, total] = await Promise.all([
     Review.find(query)
       .populate("customer", "name profileImage")
-      .select("-jobCard")
-      .sort({ createdAt: -1 })
+      .select("-moderationLogs")
+      .sort(sortOrder)
       .skip(skip)
       .limit(limit)
       .lean(),
@@ -220,7 +294,7 @@ const getPublicReviews = asyncHandler(async (req, res) => {
 
   const mapped = reviews.map((r) => ({
     ...r,
-    isVisible: r.isPublic,
+    isVisible: r.status === "APPROVED" || r.isPublic,
   }));
 
   ApiResponse.paginated(
@@ -335,19 +409,58 @@ const toggleVisibility = asyncHandler(async (req, res) => {
     throw ApiError.notFound("Review not found");
   }
 
-  review.isPublic = !review.isPublic;
+  // Toggle between APPROVED and HIDDEN status
+  const newStatus = review.status === "HIDDEN" ? "APPROVED" : "HIDDEN";
+  review.status = newStatus;
+  review.isPublic = newStatus === "APPROVED";
+
   review.moderationLogs = review.moderationLogs || [];
   review.moderationLogs.push({
-    action: review.isPublic ? "SHOWN" : "HIDDEN",
+    action: newStatus === "APPROVED" ? "SHOWN" : "HIDDEN",
     actor: req.userId,
   });
   await review.save();
 
   ApiResponse.success(
     res,
-    `Review ${review.isPublic ? "published" : "hidden"} successfully`,
+    `Review ${newStatus === "APPROVED" ? "published" : "hidden"} successfully`,
     review
   );
+  updateGarageRatingSummary().catch(() => {});
+});
+
+/**
+ * @desc    Update review status (Admin)
+ * @route   PUT /api/v1/admin/reviews/:id/status
+ * @access  Private/Admin
+ */
+const updateReviewStatus = asyncHandler(async (req, res) => {
+  const { status } = req.body;
+
+  if (!["PENDING", "APPROVED", "HIDDEN"].includes(status)) {
+    throw ApiError.badRequest("Invalid status. Use PENDING, APPROVED, or HIDDEN");
+  }
+
+  const review = await Review.findById(req.params.id);
+
+  if (!review) {
+    throw ApiError.notFound("Review not found");
+  }
+
+  const previousStatus = review.status;
+  review.status = status;
+  review.isPublic = status === "APPROVED";
+  review.isVerified = status === "APPROVED";
+
+  review.moderationLogs = review.moderationLogs || [];
+  review.moderationLogs.push({
+    action: status,
+    actor: req.userId,
+    remarks: `Status changed from ${previousStatus || "N/A"} to ${status}`,
+  });
+  await review.save();
+
+  ApiResponse.success(res, `Review status updated to ${status}`, review);
   updateGarageRatingSummary().catch(() => {});
 });
 
@@ -424,6 +537,7 @@ const getReviewAnalytics = asyncHandler(async (req, res) => {
 module.exports = {
   // User
   getMyReviews,
+  getReviewByJobCard,
   createReview,
   updateReview,
   deleteReview,
@@ -434,5 +548,6 @@ module.exports = {
   getAllReviews,
   respondToReview,
   toggleVisibility,
+  updateReviewStatus,
   getReviewAnalytics,
 };

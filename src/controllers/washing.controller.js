@@ -1248,3 +1248,310 @@ exports.assignVehicleToZone = async (req, res) => {
     });
   }
 };
+
+/**
+ * ==================== CUSTOMER ENDPOINTS ====================
+ */
+
+/**
+ * Get customer's wash history for a vehicle
+ * @route GET /api/v1/washing/history/:vehicleId
+ */
+exports.getCustomerWashHistory = async (req, res) => {
+  try {
+    const { vehicleId } = req.params;
+    const { month, year, page = 1, limit = 31 } = req.query;
+
+    // Verify vehicle belongs to customer
+    const vehicle = await Vehicle.findOne({
+      _id: vehicleId,
+      owner: req.user._id,
+      isActive: true,
+    });
+
+    if (!vehicle) {
+      return res.status(404).json({
+        success: false,
+        message: "Vehicle not found or access denied",
+      });
+    }
+
+    // Build date filter
+    const now = new Date();
+    let dateFilter = { $lte: now }; // Never show future dates
+
+    if (month && year) {
+      const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+      const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+      dateFilter = {
+        $gte: startDate,
+        $lte: endDate > now ? now : endDate,
+      };
+    } else if (year) {
+      const startDate = new Date(parseInt(year), 0, 1);
+      const endDate = new Date(parseInt(year), 11, 31, 23, 59, 59);
+      dateFilter = {
+        $gte: startDate,
+        $lte: endDate > now ? now : endDate,
+      };
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [washLogs, total] = await Promise.all([
+      CarWash.find({
+        vehicle: vehicleId,
+        customer: req.user._id,
+        date: dateFilter,
+      })
+        .select("date status washType completedAt notes skipReason zone area")
+        .populate("zone", "name code")
+        .populate("area", "name code")
+        .sort({ date: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      CarWash.countDocuments({
+        vehicle: vehicleId,
+        customer: req.user._id,
+        date: dateFilter,
+      }),
+    ]);
+
+    // Map status for customer-friendly display
+    const mappedLogs = washLogs.map((log) => ({
+      _id: log._id,
+      date: log.date,
+      status: mapWashStatus(log.status),
+      originalStatus: log.status,
+      washType: log.washType,
+      completedAt: log.completedAt,
+      zone: log.zone,
+      area: log.area,
+      notes: log.notes,
+      skipReason: log.skipReason,
+    }));
+
+    res.json({
+      success: true,
+      message: "Wash history fetched successfully",
+      data: {
+        vehicle: {
+          _id: vehicle._id,
+          vehicleNumber: vehicle.vehicleNumber,
+          brand: vehicle.brand,
+          model: vehicle.model,
+        },
+        washLogs: mappedLogs,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / parseInt(limit)),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get customer wash history error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch wash history",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Get customer's wash summary for a month
+ * @route GET /api/v1/washing/summary/:vehicleId
+ */
+exports.getCustomerWashSummary = async (req, res) => {
+  try {
+    const { vehicleId } = req.params;
+    const { month, year } = req.query;
+
+    // Verify vehicle belongs to customer
+    const vehicle = await Vehicle.findOne({
+      _id: vehicleId,
+      owner: req.user._id,
+      isActive: true,
+    });
+
+    if (!vehicle) {
+      return res.status(404).json({
+        success: false,
+        message: "Vehicle not found or access denied",
+      });
+    }
+
+    // Default to current month
+    const now = new Date();
+    const targetMonth = month ? parseInt(month) - 1 : now.getMonth();
+    const targetYear = year ? parseInt(year) : now.getFullYear();
+
+    const startDate = new Date(targetYear, targetMonth, 1);
+    const endDate = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
+    const effectiveEndDate = endDate > now ? now : endDate;
+
+    // Get summary counts
+    const summary = await CarWash.aggregate([
+      {
+        $match: {
+          vehicle: new mongoose.Types.ObjectId(vehicleId),
+          customer: req.user._id,
+          date: { $gte: startDate, $lte: effectiveEndDate },
+        },
+      },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // Calculate total days in month (up to today if current month)
+    const totalDays = effectiveEndDate.getDate();
+
+    // Build summary object
+    const statusCounts = {
+      washed: 0,
+      notWashed: 0,
+      holiday: 0,
+      pending: 0,
+    };
+
+    summary.forEach((s) => {
+      switch (s._id) {
+        case "completed":
+          statusCounts.washed = s.count;
+          break;
+        case "skipped":
+        case "cancelled":
+          statusCounts.notWashed += s.count;
+          break;
+        case "holiday":
+          statusCounts.holiday = s.count;
+          break;
+        case "pending":
+          statusCounts.pending = s.count;
+          break;
+      }
+    });
+
+    const totalRecords =
+      statusCounts.washed +
+      statusCounts.notWashed +
+      statusCounts.holiday +
+      statusCounts.pending;
+    const washRate =
+      totalRecords > 0
+        ? Math.round(
+            (statusCounts.washed / (totalRecords - statusCounts.holiday)) * 100
+          )
+        : 0;
+
+    res.json({
+      success: true,
+      message: "Wash summary fetched successfully",
+      data: {
+        vehicle: {
+          _id: vehicle._id,
+          vehicleNumber: vehicle.vehicleNumber,
+          brand: vehicle.brand,
+          model: vehicle.model,
+        },
+        month: targetMonth + 1,
+        year: targetYear,
+        monthName: new Date(targetYear, targetMonth).toLocaleString("default", {
+          month: "long",
+        }),
+        totalDays,
+        summary: statusCounts,
+        washRate: isNaN(washRate) ? 0 : washRate,
+      },
+    });
+  } catch (error) {
+    console.error("Get customer wash summary error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch wash summary",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Get customer's vehicles with wash subscription
+ * @route GET /api/v1/washing/my-vehicles
+ */
+exports.getCustomerWashVehicles = async (req, res) => {
+  try {
+    const vehicles = await Vehicle.find({
+      owner: req.user._id,
+      isActive: true,
+    })
+      .select(
+        "vehicleNumber brand model color vehicleType image washZone washArea washSubscription"
+      )
+      .populate("washZone", "name code")
+      .populate("washArea", "name code")
+      .lean();
+
+    // Get today's wash status for each vehicle
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const todayStatuses = await CarWash.find({
+      customer: req.user._id,
+      date: { $gte: today, $lt: tomorrow },
+    })
+      .select("vehicle status")
+      .lean();
+
+    const statusMap = {};
+    todayStatuses.forEach((ws) => {
+      statusMap[ws.vehicle.toString()] = mapWashStatus(ws.status);
+    });
+
+    const vehiclesWithStatus = vehicles.map((v) => ({
+      ...v,
+      todayWashStatus: statusMap[v._id.toString()] || null,
+      hasWashSubscription: v.washSubscription?.isActive || false,
+    }));
+
+    res.json({
+      success: true,
+      message: "Vehicles fetched successfully",
+      data: { vehicles: vehiclesWithStatus },
+    });
+  } catch (error) {
+    console.error("Get customer wash vehicles error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch vehicles",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Helper to map internal status to customer-friendly status
+ */
+function mapWashStatus(status) {
+  switch (status) {
+    case "completed":
+      return "WASHED";
+    case "skipped":
+    case "cancelled":
+      return "NOT_WASHED";
+    case "holiday":
+      return "HOLIDAY";
+    case "pending":
+      return "PENDING";
+    default:
+      return "NO_RECORD";
+  }
+}

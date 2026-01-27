@@ -44,6 +44,12 @@ const serviceSchema = new mongoose.Schema(
       required: [true, "Base price is required"],
       min: [0, "Price cannot be negative"],
     },
+    taxPercentage: {
+      type: Number,
+      default: 18,
+      min: [0, "Tax percentage cannot be negative"],
+      max: [100, "Tax percentage cannot exceed 100"],
+    },
     estimatedDuration: {
       value: {
         type: Number,
@@ -82,7 +88,7 @@ const serviceSchema = new mongoose.Schema(
         return ret;
       },
     },
-  }
+  },
 );
 
 // Indexes

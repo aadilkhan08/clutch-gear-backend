@@ -3,6 +3,7 @@
  * Stores OTP for mobile verification
  */
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 const config = require("../config");
 
 const otpSchema = new mongoose.Schema(
@@ -12,7 +13,7 @@ const otpSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    otp: {
+    otpHash: {
       type: String,
       required: true,
     },
@@ -48,11 +49,11 @@ otpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // TTL index
 /**
  * Check if OTP is valid
  */
-otpSchema.methods.isValid = function (inputOtp) {
+otpSchema.methods.isValid = async function (inputOtp) {
   if (this.isUsed) return false;
   if (this.attempts >= config.otp.maxAttempts) return false;
   if (new Date() > this.expiresAt) return false;
-  return this.otp === inputOtp;
+  return bcrypt.compare(inputOtp, this.otpHash);
 };
 
 /**
@@ -84,15 +85,17 @@ otpSchema.statics.generateOTP = async function (mobile, purpose = "login") {
     Math.floor(Math.random() * 10)
   ).join("");
 
+  const otpHash = await bcrypt.hash(otp, 10);
+
   // Create new OTP document
   const otpDoc = await this.create({
     mobile,
-    otp,
+    otpHash,
     purpose,
     expiresAt: new Date(Date.now() + config.otp.expiryMinutes * 60 * 1000),
   });
 
-  return otpDoc;
+  return { otpDoc, otp };
 };
 
 /**
@@ -114,7 +117,8 @@ otpSchema.statics.verifyOTP = async function (mobile, otp, purpose = "login") {
     return { success: false, message: "Maximum attempts exceeded" };
   }
 
-  if (otpDoc.otp !== otp) {
+  const isMatch = await bcrypt.compare(otp, otpDoc.otpHash);
+  if (!isMatch) {
     await otpDoc.incrementAttempts();
     const remaining = config.otp.maxAttempts - otpDoc.attempts;
     return {

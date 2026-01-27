@@ -19,6 +19,7 @@ const {
   garageController,
   couponController,
   insuranceJobController,
+  invoiceController,
 } = require("../controllers");
 const {
   authenticate,
@@ -142,12 +143,12 @@ router.get("/users", adminController.getAllUsers);
 router.get(
   "/users/:id",
   validateObjectId("id"),
-  adminController.getUserDetails
+  adminController.getUserDetails,
 );
 router.put(
   "/users/:id/status",
   validateObjectId("id"),
-  adminController.updateUserStatus
+  adminController.updateUserStatus,
 );
 
 // Customer Management (Walk-in)
@@ -156,22 +157,22 @@ router.post(
   "/customers/walk-in",
   createWalkInCustomerValidation,
   validate,
-  adminController.createWalkInCustomer
+  adminController.createWalkInCustomer,
 );
 router.get(
   "/customers/:id/vehicles",
   validateObjectId("id"),
-  adminController.getCustomerVehicles
+  adminController.getCustomerVehicles,
 );
 router.post(
   "/customers/:id/vehicles",
   validateObjectId("id"),
-  adminController.addCustomerVehicle
+  adminController.addCustomerVehicle,
 );
 router.get(
   "/customers/:id/history",
   validateObjectId("id"),
-  adminController.getCustomerServiceHistory
+  adminController.getCustomerServiceHistory,
 );
 
 // Mechanic role management (admin-controlled)
@@ -179,21 +180,21 @@ router.get("/mechanics", adminController.listMechanics);
 router.get(
   "/mechanics/:id",
   validateObjectId("id"),
-  adminController.getMechanic
+  adminController.getMechanic,
 );
 router.get("/mechanics/workload", adminController.getAllMechanicsWorkload);
 router.get("/mechanics/workload/all", adminController.getAllMechanicsWorkload);
 router.get(
   "/mechanics/:id/workload",
   validateObjectId("id"),
-  adminController.getMechanicWorkload
+  adminController.getMechanicWorkload,
 );
 router.put(
   "/users/:id/role",
   validateObjectId("id"),
   updateUserRoleValidation,
   validate,
-  adminController.updateUserRole
+  adminController.updateUserRole,
 );
 // Admin creation/promotions are restricted to Super Admin via /superadmin endpoints
 
@@ -203,18 +204,23 @@ router.post("/timeslots", adminController.upsertTimeSlot);
 router.delete(
   "/timeslots/:id",
   validateObjectId("id"),
-  adminController.deleteTimeSlot
+  adminController.deleteTimeSlot,
 );
 
 // Appointments
 router.get("/appointments", appointmentController.getAllAppointments);
 router.get("/appointments/today", appointmentController.getTodayAppointments);
+router.get(
+  "/appointments/:id",
+  validateObjectId("id"),
+  appointmentController.getAdminAppointment,
+);
 router.put(
   "/appointments/:id",
   validateObjectId("id"),
   updateAppointmentValidation,
   validate,
-  appointmentController.updateAppointment
+  appointmentController.updateAppointment,
 );
 
 // Job Cards
@@ -223,52 +229,57 @@ router.get("/jobcards/stats", jobcardController.getJobCardStats);
 router.get(
   "/jobcards/:id",
   validateObjectId("id"),
-  jobcardController.getJobCardById
+  jobcardController.getJobCardById,
 );
 router.post(
   "/jobcards",
   createJobCardValidation,
   validate,
-  jobcardController.createJobCard
+  jobcardController.createJobCard,
 );
 router.put(
   "/jobcards/:id",
   validateObjectId("id"),
   updateJobCardValidation,
   validate,
-  jobcardController.updateJobCard
+  jobcardController.updateJobCard,
 );
 router.put(
   "/jobcards/:id/assign-mechanics",
   validateObjectId("id"),
   assignMechanicsValidation,
   validate,
-  jobcardController.assignMechanics
+  jobcardController.assignMechanics,
+);
+router.put(
+  "/jobcards/:id/estimate",
+  validateObjectId("id"),
+  jobcardController.createOrUpdateEstimate,
 );
 router.post(
   "/jobcards/:id/items",
   validateObjectId("id"),
   addJobItemValidation,
   validate,
-  jobcardController.addJobItem
+  jobcardController.addJobItem,
 );
 router.delete(
   "/jobcards/:id/items/:itemId",
   validateObjectId("id"),
-  jobcardController.removeJobItem
+  jobcardController.removeJobItem,
 );
 router.put(
   "/jobcards/:id/billing",
   validateObjectId("id"),
   updateBillingValidation,
   validate,
-  jobcardController.updateBilling
+  jobcardController.updateBilling,
 );
 router.post(
   "/jobcards/:id/images",
   validateObjectId("id"),
   imageUpload.array("images", 10),
-  jobcardController.uploadJobCardImages
+  jobcardController.uploadJobCardImages,
 );
 
 // Video uploads for job cards
@@ -276,7 +287,7 @@ router.post(
   "/jobcards/:id/videos",
   validateObjectId("id"),
   videoUpload.array("videos", 5),
-  jobcardController.uploadJobCardVideos
+  jobcardController.uploadJobCardVideos,
 );
 
 // Mixed media uploads for job cards
@@ -284,7 +295,7 @@ router.post(
   "/jobcards/:id/media",
   validateObjectId("id"),
   mediaUpload.array("media", 15),
-  jobcardController.uploadJobCardMedia
+  jobcardController.uploadJobCardMedia,
 );
 
 // Payments
@@ -295,60 +306,60 @@ router.post(
   "/payments",
   createPaymentValidation,
   validate,
-  paymentController.createPayment
+  paymentController.createPayment,
 );
 router.post(
   "/payments/:id/razorpay/order",
   validateObjectId("id"),
-  paymentController.createRazorpayOrderForPaymentAdmin
+  paymentController.createRazorpayOrderForPaymentAdmin,
 );
 router.post(
   "/payments/:id/razorpay/verify",
   validateObjectId("id"),
-  paymentController.verifyRazorpayPaymentNative
+  paymentController.verifyRazorpayPaymentNative,
 );
 router.put(
   "/payments/:id",
   validateObjectId("id"),
   updatePaymentValidation,
   validate,
-  paymentController.updatePayment
+  paymentController.updatePayment,
 );
 router.post(
   "/payments/:id/refund",
   validateObjectId("id"),
   refundPaymentValidation,
   validate,
-  paymentController.processRefund
+  paymentController.processRefund,
 );
 // Advanced Payments
 router.get(
   "/payments/advanced/dashboard",
-  advancedPaymentController.adminDashboard
+  advancedPaymentController.adminDashboard,
 );
 router.get(
   "/payments/advanced",
   listPaymentValidation,
   validate,
-  advancedPaymentController.listAdminPayments
+  advancedPaymentController.listAdminPayments,
 );
 router.post(
   "/payments/advanced",
   createInvoicePaymentValidation,
   validate,
-  advancedPaymentController.createInvoicePayment
+  advancedPaymentController.createInvoicePayment,
 );
 router.post(
   "/payments/advanced/:id/transactions",
   addTransactionValidation,
   validate,
-  advancedPaymentController.addTransaction
+  advancedPaymentController.addTransaction,
 );
 router.post(
   "/payments/advanced/:id/mark-paid",
   markPaidValidation,
   validate,
-  advancedPaymentController.markPaid
+  advancedPaymentController.markPaid,
 );
 
 // Refund Requests
@@ -357,25 +368,25 @@ router.put(
   "/refunds/:id/approve",
   refundActionValidation,
   validate,
-  advancedPaymentController.approveRefund
+  advancedPaymentController.approveRefund,
 );
 router.put(
   "/refunds/:id/reject",
   refundActionValidation,
   validate,
-  advancedPaymentController.rejectRefund
+  advancedPaymentController.rejectRefund,
 );
 router.put(
   "/refunds/:id/process",
   refundActionValidation,
   validate,
-  advancedPaymentController.processRefund
+  advancedPaymentController.processRefund,
 );
 // Invoice PDF download
 router.get(
   "/payments/:id/invoice",
   validateObjectId("id"),
-  paymentController.downloadInvoice
+  paymentController.downloadInvoice,
 );
 
 // Reviews
@@ -386,12 +397,17 @@ router.put(
   validateObjectId("id"),
   adminResponseValidation,
   validate,
-  reviewController.respondToReview
+  reviewController.respondToReview,
 );
 router.put(
   "/reviews/:id/visibility",
   validateObjectId("id"),
-  reviewController.toggleVisibility
+  reviewController.toggleVisibility,
+);
+router.put(
+  "/reviews/:id/status",
+  validateObjectId("id"),
+  reviewController.updateReviewStatus,
 );
 
 // Coupons
@@ -399,26 +415,26 @@ router.get(
   "/coupons",
   listCouponValidation,
   validate,
-  couponController.listAdminCoupons
+  couponController.listAdminCoupons,
 );
 router.get("/coupons/analytics", couponController.getCouponAnalytics);
 router.post(
   "/coupons",
   createCouponValidation,
   validate,
-  couponController.createCoupon
+  couponController.createCoupon,
 );
 router.put(
   "/coupons/:id",
   validateObjectId("id"),
   updateCouponValidation,
   validate,
-  couponController.updateCoupon
+  couponController.updateCoupon,
 );
 router.put(
   "/coupons/:id/toggle",
   validateObjectId("id"),
-  couponController.toggleCoupon
+  couponController.toggleCoupon,
 );
 
 // Insurance Jobs
@@ -426,32 +442,32 @@ router.get(
   "/insurance-jobs",
   listInsuranceJobValidation,
   validate,
-  insuranceJobController.listAdminInsuranceJobs
+  insuranceJobController.listAdminInsuranceJobs,
 );
 router.post(
   "/insurance-jobs",
   createInsuranceJobValidation,
   validate,
-  insuranceJobController.createInsuranceJob
+  insuranceJobController.createInsuranceJob,
 );
 router.get(
   "/insurance-jobs/:id",
   validateObjectId("id"),
-  insuranceJobController.getAdminInsuranceJob
+  insuranceJobController.getAdminInsuranceJob,
 );
 router.put(
   "/insurance-jobs/:id",
   validateObjectId("id"),
   updateInsuranceDetailsValidation,
   validate,
-  insuranceJobController.updateInsuranceDetails
+  insuranceJobController.updateInsuranceDetails,
 );
 router.put(
   "/insurance-jobs/:id/status",
   validateObjectId("id"),
   updateClaimStatusValidation,
   validate,
-  insuranceJobController.updateClaimStatus
+  insuranceJobController.updateClaimStatus,
 );
 router.post(
   "/insurance-jobs/:id/documents",
@@ -459,13 +475,13 @@ router.post(
   insuranceDocUpload.single("document"),
   uploadDocumentValidation,
   validate,
-  insuranceJobController.uploadDocument
+  insuranceJobController.uploadDocument,
 );
 router.delete(
   "/insurance-jobs/:id/documents/:docId",
   validateObjectId("id"),
   validateObjectId("docId"),
-  insuranceJobController.deleteDocument
+  insuranceJobController.deleteDocument,
 );
 
 // Garage Profile
@@ -474,7 +490,7 @@ router.put(
   "/garage/profile",
   updateGarageProfileValidation,
   validate,
-  garageController.updateProfile
+  garageController.updateProfile,
 );
 router.post("/garage/ratings/recalculate", garageController.recalculateRatings);
 
@@ -485,45 +501,45 @@ router.post(
   "/enquiries",
   createEnquiryValidation,
   validate,
-  enquiryController.createEnquiry
+  enquiryController.createEnquiry,
 );
 router.get(
   "/enquiries/:id",
   validateObjectId("id"),
-  enquiryController.getEnquiry
+  enquiryController.getEnquiry,
 );
 router.put(
   "/enquiries/:id",
   validateObjectId("id"),
   updateEnquiryValidation,
   validate,
-  enquiryController.updateEnquiry
+  enquiryController.updateEnquiry,
 );
 router.post(
   "/enquiries/:id/follow-up",
   validateObjectId("id"),
   addFollowUpValidation,
   validate,
-  enquiryController.addFollowUp
+  enquiryController.addFollowUp,
 );
 router.put(
   "/enquiries/:id/assign",
   validateObjectId("id"),
   assignEnquiryValidation,
   validate,
-  enquiryController.assignEnquiry
+  enquiryController.assignEnquiry,
 );
 router.post(
   "/enquiries/:id/convert",
   validateObjectId("id"),
   convertEnquiryValidation,
   validate,
-  enquiryController.convertEnquiry
+  enquiryController.convertEnquiry,
 );
 router.delete(
   "/enquiries/:id",
   validateObjectId("id"),
-  enquiryController.deleteEnquiry
+  enquiryController.deleteEnquiry,
 );
 
 // ============ Package Management ============
@@ -532,74 +548,97 @@ router.get("/packages", packageController.getAllPackages);
 router.get(
   "/packages/:id",
   validateObjectId("id"),
-  packageController.getPackageById
+  packageController.getPackageById,
 );
 router.post(
   "/packages",
   createPackageValidation,
   validate,
-  packageController.createPackage
+  packageController.createPackage,
 );
 router.put(
   "/packages/:id",
   validateObjectId("id"),
   updatePackageValidation,
   validate,
-  packageController.updatePackage
+  packageController.updatePackage,
 );
 router.put(
   "/packages/:id/toggle-status",
   validateObjectId("id"),
-  packageController.togglePackageStatus
+  packageController.togglePackageStatus,
 );
 router.delete(
   "/packages/:id",
   validateObjectId("id"),
-  packageController.deletePackage
+  packageController.deletePackage,
 );
 
 // ============ Subscription Management ============
 router.get(
   "/subscriptions/reports/usage",
-  subscriptionController.getUsageReport
+  subscriptionController.getUsageReport,
 );
 router.post(
   "/subscriptions/expire-check",
-  subscriptionController.expireSubscriptions
+  subscriptionController.expireSubscriptions,
 );
 router.get("/subscriptions", subscriptionController.getAllSubscriptions);
 router.get(
   "/subscriptions/:id",
   validateObjectId("id"),
-  subscriptionController.getSubscriptionDetails
+  subscriptionController.getSubscriptionDetails,
 );
 router.post(
   "/subscriptions/:id/activate",
   validateObjectId("id"),
   activateSubscriptionValidation,
   validate,
-  subscriptionController.activateSubscription
+  subscriptionController.activateSubscription,
 );
 router.post(
   "/subscriptions/:id/cancel",
   validateObjectId("id"),
   cancelSubscriptionValidation,
   validate,
-  subscriptionController.cancelSubscription
+  subscriptionController.cancelSubscription,
 );
 router.post(
   "/subscriptions/:id/extend",
   validateObjectId("id"),
   extendSubscriptionValidation,
   validate,
-  subscriptionController.extendSubscription
+  subscriptionController.extendSubscription,
 );
 router.post(
   "/subscriptions/:id/use-service",
   validateObjectId("id"),
   useServiceValidation,
   validate,
-  subscriptionController.useSubscriptionService
+  subscriptionController.useSubscriptionService,
+);
+
+// ============ Invoice Management ============
+router.get("/invoices", invoiceController.getInvoicesAdmin);
+router.get(
+  "/invoices/:id",
+  validateObjectId("id"),
+  invoiceController.getInvoiceAdmin,
+);
+router.get(
+  "/invoices/:id/pdf",
+  validateObjectId("id"),
+  invoiceController.downloadInvoicePDFAdmin,
+);
+router.put(
+  "/invoices/:id/cancel",
+  validateObjectId("id"),
+  invoiceController.cancelInvoice,
+);
+router.post(
+  "/jobcards/:id/generate-invoice",
+  validateObjectId("id"),
+  invoiceController.generateInvoiceFromJobCard,
 );
 
 module.exports = router;

@@ -30,6 +30,9 @@ const ServiceSchedule = require("./serviceSchedule.model");
 const Zone = require("./zone.model");
 const Area = require("./area.model");
 
+// Notifications
+const Notification = require("./notification.model");
+
 module.exports = {
   User,
   OTP,
@@ -56,4 +59,6 @@ module.exports = {
   // Car Washing
   Zone,
   Area,
+  // Notifications
+  Notification,
 };

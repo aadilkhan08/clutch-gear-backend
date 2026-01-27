@@ -28,11 +28,11 @@ const upload = multer({
   },
 });
 
-// Public routes
-router.get("/", serviceController.getServices);
-router.get("/popular", serviceController.getPopularServices);
-router.get("/categories/list", serviceController.getCategories);
-router.get("/category/:category", serviceController.getServicesByCategory);
+// Customer routes (authenticated)
+router.get("/", authenticate, serviceController.getServices);
+router.get("/popular", authenticate, serviceController.getPopularServices);
+router.get("/categories/list", authenticate, serviceController.getCategories);
+router.get("/category/:category", authenticate, serviceController.getServicesByCategory);
 
 // Admin list route (includes inactive)
 router.get(
@@ -41,7 +41,12 @@ router.get(
   isAdmin,
   serviceController.getServicesAdmin
 );
-router.get("/:id", validateObjectId("id"), serviceController.getService);
+router.get(
+  "/:id",
+  authenticate,
+  validateObjectId("id"),
+  serviceController.getService
+);
 
 // Admin routes
 router.post(

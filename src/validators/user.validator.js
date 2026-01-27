@@ -5,6 +5,10 @@
 const { body } = require("express-validator");
 
 const updateProfileValidation = [
+  body("mobile")
+    .not()
+    .exists()
+    .withMessage("Mobile number cannot be updated"),
   body("name")
     .optional()
     .trim()
@@ -35,6 +39,28 @@ const updateProfileValidation = [
     .optional()
     .matches(/^\d{6}$/)
     .withMessage("Please enter a valid 6-digit pincode"),
+  body().custom((value, { req }) => {
+    const { name, address, isProfileComplete } = req.body || {};
+    const addr = address || {};
+    const hasAnyAddressField =
+      addr.street || addr.city || addr.state || addr.pincode || addr.landmark;
+
+    if (isProfileComplete || hasAnyAddressField) {
+      if (!name || !String(name).trim()) {
+        throw new Error("Name is required");
+      }
+
+      const missing = ["street", "city", "state", "pincode"].filter(
+        (field) => !addr?.[field] || !String(addr[field]).trim()
+      );
+
+      if (missing.length) {
+        throw new Error("Complete address is required");
+      }
+    }
+
+    return true;
+  }),
 ];
 
 const updateDeviceInfoValidation = [

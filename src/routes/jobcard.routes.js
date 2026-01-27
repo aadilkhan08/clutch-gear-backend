@@ -19,6 +19,30 @@ router.get(
   validateObjectId("id"),
   jobcardController.getJobCardHistory
 );
+router.get(
+  "/:id/inspection-media",
+  validateObjectId("id"),
+  jobcardController.getInspectionMedia
+);
+
+// Estimate routes (Customer)
+router.get(
+  "/:id/estimate",
+  validateObjectId("id"),
+  jobcardController.getEstimate
+);
+router.post(
+  "/:id/estimate/approve",
+  validateObjectId("id"),
+  jobcardController.approveEstimate
+);
+router.post(
+  "/:id/estimate/reject",
+  validateObjectId("id"),
+  jobcardController.rejectEstimate
+);
+
+// Legacy item approval route
 router.put(
   "/:id/approve",
   validateObjectId("id"),
