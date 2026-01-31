@@ -21,6 +21,8 @@
   "author": "ClutchGear Team",
   "license": "ISC",
   "dependencies": {
+    "@msg91comm/sendotp-react-native": "^2.1.0",
+    "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

@@ -100,6 +100,15 @@ const config = {
     senderId: process.env.SMS_SENDER_ID || "CLUTCH",
   },
 
+  // MSG91
+  msg91: {
+    authKey: process.env.MSG91_AUTH_KEY || process.env.SMS_API_KEY,
+    senderId: process.env.MSG91_SENDER_ID || process.env.SMS_SENDER_ID || "CLUTCH",
+    otpTemplateId: process.env.MSG91_OTP_TEMPLATE_ID,
+    flowTemplateId: process.env.MSG91_FLOW_TEMPLATE_ID,
+    webhookToken: process.env.MSG91_WEBHOOK_TOKEN,
+  },
+
   // ImageKit
   imagekit: {
     publicKey: process.env.IMAGEKIT_PUBLIC_KEY,

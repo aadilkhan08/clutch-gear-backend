@@ -29,6 +29,7 @@ const serviceScheduleRoutes = require("./serviceSchedule.routes");
 const serviceScheduleUserRoutes = require("./serviceSchedule.user.routes");
 const invoiceRoutes = require("./invoice.routes");
 const notificationRoutes = require("./notification.routes");
+const webhookRoutes = require("./webhook.routes");
 
 // Health check
 router.get("/health", (req, res) => {
@@ -64,5 +65,6 @@ router.use("/subscriptions", subscriptionRoutes);
 router.use("/service-schedules", serviceScheduleUserRoutes);
 router.use("/invoices", invoiceRoutes);
 router.use("/notifications", notificationRoutes);
+router.use("/webhooks", webhookRoutes);
 
 module.exports = router;

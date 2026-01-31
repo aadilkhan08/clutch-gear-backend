@@ -2,6 +2,7 @@
  * SMS Service
  * Handles sending SMS messages (OTP, notifications)
  */
+const axios = require("axios");
 const config = require("../config");
 
 /**
@@ -20,9 +21,6 @@ const sendSMS = async (mobile, message) => {
         });
         return { success: true, provider: "console" };
 
-      case "twilio":
-        return await sendTwilioSMS(mobile, message);
-
       case "msg91":
         return await sendMsg91SMS(mobile, message);
 
@@ -37,40 +35,91 @@ const sendSMS = async (mobile, message) => {
 };
 
 /**
- * Send SMS via Twilio
- */
-const sendTwilioSMS = async (mobile, message) => {
-  // Twilio implementation
-  // const twilio = require('twilio');
-  // const client = twilio(config.sms.accountSid, config.sms.authToken);
-  // await client.messages.create({
-  //   body: message,
-  //   from: config.sms.phoneNumber,
-  //   to: mobile,
-  // });
-  console.log("📱 Twilio SMS:", { to: mobile, message });
-  return { success: true, provider: "twilio" };
-};
-
-/**
  * Send SMS via MSG91
  */
 const sendMsg91SMS = async (mobile, message) => {
-  // MSG91 implementation
-  // const axios = require('axios');
-  // await axios.post('https://api.msg91.com/api/v5/flow/', {
-  //   template_id: config.sms.templateId,
-  //   mobile,
-  //   ...
-  // });
-  console.log("📱 MSG91 SMS:", { to: mobile, message });
-  return { success: true, provider: "msg91" };
+  const { authKey, flowTemplateId } = config.msg91;
+  if (!authKey || !flowTemplateId) {
+    throw new Error("MSG91 auth key or flow template ID not configured");
+  }
+
+  const payload = {
+    template_id: flowTemplateId,
+    short_url: "0",
+    recipients: [
+      {
+        mobiles: mobile.replace(/\D/g, ""),
+        message,
+      },
+    ],
+  };
+
+  const response = await axios.post(
+    "https://api.msg91.com/api/v5/flow/",
+    payload,
+    {
+      headers: {
+        authkey: authKey,
+        "Content-Type": "application/json",
+      },
+      timeout: 15000,
+    }
+  );
+
+  return {
+    success: true,
+    provider: "msg91",
+    response: response.data,
+  };
+};
+
+/**
+ * Send OTP via MSG91 (using flow template variables)
+ */
+const sendMsg91OTP = async (mobile, otp) => {
+  const { authKey, otpTemplateId } = config.msg91;
+  if (!authKey || !otpTemplateId) {
+    throw new Error("MSG91 auth key or OTP template ID not configured");
+  }
+
+  const payload = {
+    template_id: otpTemplateId,
+    short_url: "0",
+    recipients: [
+      {
+        mobiles: mobile.replace(/\D/g, ""),
+        otp,
+      },
+    ],
+  };
+
+  const response = await axios.post(
+    "https://api.msg91.com/api/v5/flow/",
+    payload,
+    {
+      headers: {
+        authkey: authKey,
+        "Content-Type": "application/json",
+      },
+      timeout: 15000,
+    }
+  );
+
+  return {
+    success: true,
+    provider: "msg91",
+    response: response.data,
+  };
 };
 
 /**
  * Send OTP SMS
  */
 const sendOTP = async (mobile, otp) => {
+  if (config.sms.provider === "msg91") {
+    return await sendMsg91OTP(mobile, otp);
+  }
+
   const message = `Your ClutchGear OTP is ${otp}. Valid for ${config.otp.expiryMinutes} minutes. Do not share with anyone.`;
   return await sendSMS(mobile, message);
 };
