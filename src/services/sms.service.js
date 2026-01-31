@@ -74,7 +74,7 @@ const sendMsg91SMS = async (mobile, message) => {
 };
 
 /**
- * Send OTP via MSG91 (using flow template variables)
+ * Send OTP via MSG91 (using Send OTP API)
  */
 const sendMsg91OTP = async (mobile, otp) => {
   const { authKey, otpTemplateId } = config.msg91;
@@ -82,34 +82,48 @@ const sendMsg91OTP = async (mobile, otp) => {
     throw new Error("MSG91 auth key or OTP template ID not configured");
   }
 
-  const payload = {
-    template_id: otpTemplateId,
-    short_url: "0",
-    recipients: [
+  // Format mobile number - MSG91 expects country code + number (e.g., 918720809245)
+  let formattedMobile = mobile.replace(/\D/g, "");
+  // Add 91 prefix if not present (for Indian numbers)
+  if (!formattedMobile.startsWith("91") && formattedMobile.length === 10) {
+    formattedMobile = "91" + formattedMobile;
+  }
+
+  console.log("📱 MSG91 OTP Request:", {
+    mobile: formattedMobile,
+    otp,
+    templateId: otpTemplateId,
+  });
+
+  try {
+    // Use MSG91 Send OTP API
+    const response = await axios.post(
+      `https://control.msg91.com/api/v5/otp?template_id=${otpTemplateId}&mobile=${formattedMobile}&otp=${otp}`,
+      {},
       {
-        mobiles: mobile.replace(/\D/g, ""),
-        otp,
-      },
-    ],
-  };
+        headers: {
+          authkey: authKey,
+          "Content-Type": "application/json",
+        },
+        timeout: 15000,
+      }
+    );
 
-  const response = await axios.post(
-    "https://api.msg91.com/api/v5/flow/",
-    payload,
-    {
-      headers: {
-        authkey: authKey,
-        "Content-Type": "application/json",
-      },
-      timeout: 15000,
-    }
-  );
+    console.log("✅ MSG91 OTP Response:", response.data);
 
-  return {
-    success: true,
-    provider: "msg91",
-    response: response.data,
-  };
+    return {
+      success: true,
+      provider: "msg91",
+      response: response.data,
+    };
+  } catch (error) {
+    console.error("❌ MSG91 OTP Error:", {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+    });
+    throw error;
+  }
 };
 
 /**
