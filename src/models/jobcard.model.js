@@ -43,7 +43,7 @@ const estimateItemSchema = new mongoose.Schema(
       min: 0,
     },
   },
-  { _id: true }
+  { _id: true },
 );
 
 // Estimate schema for cost estimation & approval
@@ -117,7 +117,7 @@ const estimateSchema = new mongoose.Schema(
     expiresAt: Date,
     notificationSentAt: Date,
   },
-  { _id: true }
+  { _id: true },
 );
 
 const jobItemSchema = new mongoose.Schema(
@@ -157,7 +157,7 @@ const jobItemSchema = new mongoose.Schema(
     },
     approvedAt: Date,
   },
-  { _id: true }
+  { _id: true },
 );
 
 const jobCardSchema = new mongoose.Schema(
@@ -332,8 +332,20 @@ const jobCardSchema = new mongoose.Schema(
         return ret;
       },
     },
-  }
+  },
 );
+
+const STATUS_FLOW = [
+  "created",
+  "inspection",
+  "awaiting-approval",
+  "approved",
+  "in-progress",
+  "quality-check",
+  "ready",
+  "delivered",
+];
+const TERMINAL_STATUSES = ["delivered", "cancelled"];
 
 // Indexes (jobNumber index created by unique: true)
 jobCardSchema.index({ customer: 1, status: 1 });
@@ -350,7 +362,7 @@ jobCardSchema.pre("save", async function (next) {
   if (!this.jobNumber) {
     const date = new Date();
     const dateStr = `${date.getFullYear()}${String(
-      date.getMonth() + 1
+      date.getMonth() + 1,
     ).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
     const count = await mongoose.model("JobCard").countDocuments({
       createdAt: {
@@ -379,7 +391,7 @@ jobCardSchema.methods.calculateBilling = function () {
 
   const subtotal = usedItems.reduce(
     (sum, item) => sum + Number(item.total || 0),
-    0
+    0,
   );
   const discount = Math.max(0, Number(this.billing.discount || 0));
   const afterDiscount = Math.max(0, subtotal - discount);
@@ -402,8 +414,37 @@ jobCardSchema.methods.calculateBilling = function () {
 jobCardSchema.methods.updateStatus = async function (
   newStatus,
   userId,
-  notes = ""
+  notes = "",
+  options = {},
 ) {
+  const allowSkip = Boolean(options?.allowSkip);
+  const currentStatus = this.status;
+
+  if (TERMINAL_STATUSES.includes(currentStatus)) {
+    throw new Error("Cannot update status for completed or cancelled job card");
+  }
+
+  if (!newStatus || newStatus === currentStatus) {
+    return;
+  }
+
+  if (!STATUS_FLOW.includes(newStatus) && newStatus !== "cancelled") {
+    throw new Error("Invalid status update");
+  }
+
+  if (newStatus !== "cancelled") {
+    const currentIndex = STATUS_FLOW.indexOf(currentStatus);
+    const nextIndex = STATUS_FLOW.indexOf(newStatus);
+
+    if (nextIndex < currentIndex) {
+      throw new Error("Job status cannot regress");
+    }
+
+    if (!allowSkip && nextIndex > currentIndex + 1) {
+      throw new Error("Job status cannot skip stages");
+    }
+  }
+
   this.status = newStatus;
 
   // Keep lifecycle timestamps consistent

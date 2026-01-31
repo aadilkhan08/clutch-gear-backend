@@ -3,7 +3,12 @@
  * Handles job card management
  */
 const { JobCard, Vehicle, Appointment, User, Payment } = require("../models");
-const { smsService, imagekitService, fcmService, notificationService } = require("../services");
+const {
+  smsService,
+  imagekitService,
+  fcmService,
+  notificationService,
+} = require("../services");
 const {
   ApiResponse,
   ApiError,
@@ -408,21 +413,21 @@ const approveEstimate = asyncHandler(async (req, res) => {
   // Check if estimate can be approved
   if (jobCard.estimate.status !== "PENDING_APPROVAL") {
     throw ApiError.badRequest(
-      `Estimate has already been ${jobCard.estimate.status.toLowerCase()}`
+      `Estimate has already been ${jobCard.estimate.status.toLowerCase()}`,
     );
   }
 
   // Check if job card is in correct status
   if (!["inspection", "awaiting-approval"].includes(jobCard.status)) {
     throw ApiError.badRequest(
-      "Cannot approve estimate at this stage of the job"
+      "Cannot approve estimate at this stage of the job",
     );
   }
 
   // Check if estimate has expired
   if (jobCard.estimate.expiresAt && new Date() > jobCard.estimate.expiresAt) {
     throw ApiError.badRequest(
-      "This estimate has expired. Please request a new estimate."
+      "This estimate has expired. Please request a new estimate.",
     );
   }
 
@@ -497,14 +502,14 @@ const rejectEstimate = asyncHandler(async (req, res) => {
   // Check if estimate can be rejected
   if (jobCard.estimate.status !== "PENDING_APPROVAL") {
     throw ApiError.badRequest(
-      `Estimate has already been ${jobCard.estimate.status.toLowerCase()}`
+      `Estimate has already been ${jobCard.estimate.status.toLowerCase()}`,
     );
   }
 
   // Check if job card is in correct status
   if (!["inspection", "awaiting-approval"].includes(jobCard.status)) {
     throw ApiError.badRequest(
-      "Cannot reject estimate at this stage of the job"
+      "Cannot reject estimate at this stage of the job",
     );
   }
 
@@ -544,7 +549,7 @@ const rejectEstimate = asyncHandler(async (req, res) => {
         {
           type: "ESTIMATE_REJECTED",
           jobCardId: jobCard._id.toString(),
-        }
+        },
       );
     }
   } catch (error) {
@@ -816,11 +821,15 @@ const updateJobCard = asyncHandler(async (req, res) => {
       }
     }
 
-    await jobCard.updateStatus(
-      status,
-      req.userId,
-      `Status changed to ${status}`,
-    );
+    try {
+      await jobCard.updateStatus(
+        status,
+        req.userId,
+        `Status changed to ${status}`,
+      );
+    } catch (error) {
+      throw ApiError.badRequest(error.message || "Invalid status update");
+    }
 
     // Send notification to customer (handles push + SMS based on preferences)
     try {
@@ -901,18 +910,12 @@ const assignMechanics = asyncHandler(async (req, res) => {
  * @access  Private/Admin
  */
 const createOrUpdateEstimate = asyncHandler(async (req, res) => {
-  const {
-    items,
-    discountAmount,
-    discountReason,
-    taxRate,
-    notes,
-    expiresAt,
-  } = req.body;
+  const { items, discountAmount, discountReason, taxRate, notes, expiresAt } =
+    req.body;
 
   const jobCard = await JobCard.findById(req.params.id).populate(
     "customer",
-    "name mobile deviceInfo"
+    "name mobile deviceInfo",
   );
 
   if (!jobCard) {
@@ -922,14 +925,14 @@ const createOrUpdateEstimate = asyncHandler(async (req, res) => {
   // Cannot modify approved estimate
   if (jobCard.estimate?.status === "APPROVED") {
     throw ApiError.badRequest(
-      "Cannot modify an approved estimate. Create a supplementary estimate instead."
+      "Cannot modify an approved estimate. Create a supplementary estimate instead.",
     );
   }
 
   // Check valid job card status for estimates
   if (["delivered", "cancelled"].includes(jobCard.status)) {
     throw ApiError.badRequest(
-      "Cannot create estimate for completed or cancelled jobs"
+      "Cannot create estimate for completed or cancelled jobs",
     );
   }
 
@@ -954,7 +957,7 @@ const createOrUpdateEstimate = asyncHandler(async (req, res) => {
   });
 
   const subtotal = round2(
-    normalizedItems.reduce((sum, item) => sum + item.total, 0)
+    normalizedItems.reduce((sum, item) => sum + item.total, 0),
   );
   const discount = Math.max(0, Number(discountAmount || 0));
   const afterDiscount = Math.max(0, subtotal - discount);
@@ -996,7 +999,9 @@ const createOrUpdateEstimate = asyncHandler(async (req, res) => {
   if (jobCard.status === "created" || jobCard.status === "inspection") {
     await jobCard.updateStatus(
       req.userId,
-      isRevision ? "Revised estimate sent to customer" : "Estimate sent to customer"
+      isRevision
+        ? "Revised estimate sent to customer"
+        : "Estimate sent to customer",
     );
     jobCard.status = "awaiting-approval";
   }
@@ -1006,7 +1011,11 @@ const createOrUpdateEstimate = asyncHandler(async (req, res) => {
   // Send notification to customer about estimate
   try {
     const customerId = jobCard.customer._id || jobCard.customer;
-    await notificationService.sendEstimateApproval(customerId, jobCard, grandTotal);
+    await notificationService.sendEstimateApproval(
+      customerId,
+      jobCard,
+      grandTotal,
+    );
     jobCard.estimate.notificationSentAt = new Date();
     await jobCard.save();
   } catch (error) {
@@ -1015,12 +1024,14 @@ const createOrUpdateEstimate = asyncHandler(async (req, res) => {
 
   ApiResponse.success(
     res,
-    isRevision ? "Estimate revised successfully" : "Estimate created successfully",
+    isRevision
+      ? "Estimate revised successfully"
+      : "Estimate created successfully",
     {
       jobNumber: jobCard.jobNumber,
       estimate: jobCard.estimate,
       jobCardStatus: jobCard.status,
-    }
+    },
   );
 });
 
@@ -1132,7 +1143,11 @@ const updateAssignedJobCardStatus = asyncHandler(async (req, res) => {
       }
     }
 
-    await jobCard.updateStatus(status, req.userId, notes || "");
+    try {
+      await jobCard.updateStatus(status, req.userId, notes || "");
+    } catch (error) {
+      throw ApiError.badRequest(error.message || "Invalid status update");
+    }
   }
 
   ApiResponse.success(res, "Job card status updated successfully", jobCard);

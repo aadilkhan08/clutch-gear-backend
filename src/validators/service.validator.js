@@ -42,6 +42,14 @@ const createServiceValidation = [
     .withMessage("Base price is required")
     .isFloat({ min: 0 })
     .withMessage("Price must be a positive number"),
+  body("pickupPrice")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("Pickup price must be a positive number"),
+  body("taxPercentage")
+    .optional()
+    .isFloat({ min: 0, max: 100 })
+    .withMessage("Tax percentage must be between 0 and 100"),
   body("estimatedDuration.value")
     .notEmpty()
     .withMessage("Duration value is required")
@@ -84,6 +92,14 @@ const updateServiceValidation = [
     .optional()
     .isFloat({ min: 0 })
     .withMessage("Price must be a positive number"),
+  body("pickupPrice")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("Pickup price must be a positive number"),
+  body("taxPercentage")
+    .optional()
+    .isFloat({ min: 0, max: 100 })
+    .withMessage("Tax percentage must be between 0 and 100"),
   body("isActive")
     .optional()
     .isBoolean()

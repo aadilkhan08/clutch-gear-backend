@@ -44,6 +44,11 @@ const serviceSchema = new mongoose.Schema(
       required: [true, "Base price is required"],
       min: [0, "Price cannot be negative"],
     },
+    pickupPrice: {
+      type: Number,
+      default: 0,
+      min: [0, "Pickup price cannot be negative"],
+    },
     taxPercentage: {
       type: Number,
       default: 18,

@@ -2,7 +2,14 @@
  * Appointment Controller
  * Handles appointment booking and management
  */
-const { Appointment, Vehicle, Service, TimeSlot, User } = require("../models");
+const {
+  Appointment,
+  Vehicle,
+  Service,
+  TimeSlot,
+  User,
+  Garage,
+} = require("../models");
 const { smsService, fcmService, notificationService } = require("../services");
 const {
   ApiResponse,
@@ -108,6 +115,13 @@ const createAppointment = asyncHandler(async (req, res) => {
     price: service.basePrice,
   }));
 
+  const pickupFee = pickupRequired
+    ? Math.max(
+        0,
+        ...serviceDetails.map((service) => Number(service.pickupPrice || 0)),
+      )
+    : 0;
+
   // Check slot availability
   const existingBookings = await Appointment.countDocuments({
     scheduledDate: {
@@ -152,6 +166,21 @@ const createAppointment = asyncHandler(async (req, res) => {
     }
   }
 
+  const garage = await Garage.findOne({ isActive: true }).lean();
+  const workshopSnapshot = garage
+    ? {
+        name: garage.name,
+        address: {
+          street: garage.address?.street,
+          landmark: garage.address?.landmark,
+          city: garage.address?.city,
+          state: garage.address?.state,
+          pincode: garage.address?.pincode,
+        },
+        phone: garage.contact?.phone,
+      }
+    : undefined;
+
   // Create appointment
   const appointment = await Appointment.create({
     customer: req.userId,
@@ -159,10 +188,15 @@ const createAppointment = asyncHandler(async (req, res) => {
     services: appointmentServices,
     scheduledDate,
     timeSlot,
+    workshopSnapshot,
     customerNotes,
     pickupRequired,
+    pickupFee,
     pickupAddress: pickupRequired ? resolvedPickupAddress : undefined,
-    estimatedCost: appointmentServices.reduce((sum, s) => sum + s.price, 0),
+    estimatedCost:
+      appointmentServices.reduce((sum, s) => sum + s.price, 0) + pickupFee,
+    status: "confirmed",
+    confirmedAt: new Date(),
   });
 
   await appointment.populate([

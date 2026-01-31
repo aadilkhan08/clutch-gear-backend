@@ -47,6 +47,17 @@ const appointmentSchema = new mongoose.Schema(
         required: true,
       },
     },
+    workshopSnapshot: {
+      name: String,
+      address: {
+        street: String,
+        landmark: String,
+        city: String,
+        state: String,
+        pincode: String,
+      },
+      phone: String,
+    },
     status: {
       type: String,
       enum: [
@@ -74,6 +85,11 @@ const appointmentSchema = new mongoose.Schema(
     pickupRequired: {
       type: Boolean,
       default: false,
+    },
+    pickupFee: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     pickupAddress: {
       street: String,
@@ -123,7 +139,7 @@ const appointmentSchema = new mongoose.Schema(
         return ret;
       },
     },
-  }
+  },
 );
 
 // Indexes (appointmentNumber index created by unique: true)
@@ -139,7 +155,7 @@ appointmentSchema.pre("save", async function (next) {
   if (!this.appointmentNumber) {
     const date = new Date();
     const dateStr = `${date.getFullYear()}${String(
-      date.getMonth() + 1
+      date.getMonth() + 1,
     ).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
     const count = await mongoose.model("Appointment").countDocuments({
       createdAt: {
@@ -149,7 +165,7 @@ appointmentSchema.pre("save", async function (next) {
     });
     this.appointmentNumber = `APT${dateStr}${String(count + 1).padStart(
       4,
-      "0"
+      "0",
     )}`;
   }
   next();
@@ -160,7 +176,11 @@ appointmentSchema.pre("save", async function (next) {
  */
 appointmentSchema.virtual("totalEstimatedCost").get(function () {
   if (!this.services || this.services.length === 0) return 0;
-  return this.services.reduce((sum, s) => sum + (s.price || 0), 0);
+  const servicesTotal = this.services.reduce(
+    (sum, s) => sum + (s.price || 0),
+    0,
+  );
+  return servicesTotal + (this.pickupFee || 0);
 });
 
 appointmentSchema.set("toJSON", { virtuals: true });

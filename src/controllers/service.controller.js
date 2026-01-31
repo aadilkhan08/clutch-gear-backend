@@ -22,7 +22,7 @@ const serviceCache = new NodeCache({
 });
 
 const SERVICE_LIST_FIELDS =
-  "name description category vehicleTypes basePrice estimatedDuration image isPopular displayOrder";
+  "name description category vehicleTypes basePrice pickupPrice taxPercentage estimatedDuration image isPopular displayOrder";
 
 const buildCacheKey = (prefix, payload) =>
   `${prefix}:${JSON.stringify(payload)}`;
@@ -63,7 +63,7 @@ const getServices = asyncHandler(async (req, res) => {
       res,
       "Services fetched successfully",
       cached.services,
-      createPaginationMeta(cached.total, page, limit)
+      createPaginationMeta(cached.total, page, limit),
     );
   }
 
@@ -83,7 +83,7 @@ const getServices = asyncHandler(async (req, res) => {
     res,
     "Services fetched successfully",
     services,
-    createPaginationMeta(total, page, limit)
+    createPaginationMeta(total, page, limit),
   );
 });
 
@@ -127,7 +127,7 @@ const getServicesAdmin = asyncHandler(async (req, res) => {
     res,
     "Services fetched successfully",
     services,
-    createPaginationMeta(total, page, limit)
+    createPaginationMeta(total, page, limit),
   );
 });
 
@@ -145,7 +145,7 @@ const getPopularServices = asyncHandler(async (req, res) => {
     return ApiResponse.success(
       res,
       "Popular services fetched successfully",
-      cached
+      cached,
     );
   }
 
@@ -185,7 +185,7 @@ const getServicesByCategory = asyncHandler(async (req, res) => {
       res,
       "Services fetched successfully",
       cached.services,
-      createPaginationMeta(cached.total, page, limit)
+      createPaginationMeta(cached.total, page, limit),
     );
   }
 
@@ -205,7 +205,7 @@ const getServicesByCategory = asyncHandler(async (req, res) => {
     res,
     "Services fetched successfully",
     services,
-    createPaginationMeta(total, page, limit)
+    createPaginationMeta(total, page, limit),
   );
 });
 
@@ -249,6 +249,8 @@ const createService = asyncHandler(async (req, res) => {
     category,
     vehicleTypes,
     basePrice,
+    pickupPrice,
+    taxPercentage,
     estimatedDuration,
     inclusions,
     exclusions,
@@ -262,6 +264,8 @@ const createService = asyncHandler(async (req, res) => {
     category,
     vehicleTypes,
     basePrice,
+    pickupPrice,
+    taxPercentage,
     estimatedDuration,
     inclusions,
     exclusions,
@@ -286,6 +290,8 @@ const updateService = asyncHandler(async (req, res) => {
     "category",
     "vehicleTypes",
     "basePrice",
+    "pickupPrice",
+    "taxPercentage",
     "estimatedDuration",
     "inclusions",
     "exclusions",
@@ -304,7 +310,7 @@ const updateService = asyncHandler(async (req, res) => {
   const service = await Service.findByIdAndUpdate(
     req.params.id,
     { $set: updateData },
-    { new: true, runValidators: true }
+    { new: true, runValidators: true },
   );
 
   if (!service) {
@@ -345,7 +351,7 @@ const updateServiceImage = asyncHandler(async (req, res) => {
   const uploadResult = await imagekitService.uploadImage(
     req.file.buffer,
     `service_${service._id}`,
-    "services"
+    "services",
   );
 
   service.image = {
@@ -370,7 +376,7 @@ const deleteService = asyncHandler(async (req, res) => {
   const service = await Service.findByIdAndUpdate(
     req.params.id,
     { isActive: false },
-    { new: true }
+    { new: true },
   );
 
   if (!service) {
