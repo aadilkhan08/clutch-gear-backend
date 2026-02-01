@@ -5,7 +5,17 @@
 const ApiError = require("../utils/apiError");
 
 /**
+ * Normalize role names - "user" and "customer" are treated as equivalent
+ * The actual role stored in DB is "user", but code may reference "customer"
+ */
+const normalizeRole = (role) => {
+  if (role === "customer") return "user";
+  return role;
+};
+
+/**
  * Check if user has required role
+ * Note: "user" and "customer" are treated as the same role
  */
 const authorize = (...allowedRoles) => {
   return (req, res, next) => {
@@ -13,7 +23,10 @@ const authorize = (...allowedRoles) => {
       throw ApiError.unauthorized("Authentication required");
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
+    // Normalize allowed roles (convert "customer" to "user")
+    const normalizedAllowedRoles = allowedRoles.map(normalizeRole);
+
+    if (!normalizedAllowedRoles.includes(req.user.role)) {
       throw ApiError.forbidden(
         `Access denied. Required role: ${allowedRoles.join(" or ")}`
       );
