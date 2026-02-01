@@ -54,7 +54,7 @@ const getInvoice = asyncHandler(async (req, res) => {
  * @access  Private/Customer
  */
 const getInvoiceByJobCard = asyncHandler(async (req, res) => {
-  const invoice = await Invoice.findOne({
+  let invoice = await Invoice.findOne({
     jobCard: req.params.jobCardId,
     status: { $nin: ["DRAFT", "CANCELLED"] },
   })
@@ -62,7 +62,41 @@ const getInvoiceByJobCard = asyncHandler(async (req, res) => {
     .lean();
 
   if (!invoice) {
-    throw ApiError.notFound("Invoice not found for this job card");
+    const jobCard = await JobCard.findOne({
+      _id: req.params.jobCardId,
+      customer: req.user._id,
+    }).populate("customer", "name mobile email address gstin");
+
+    if (!jobCard) {
+      throw ApiError.notFound("Invoice not found for this job card");
+    }
+
+    if (jobCard.status === "cancelled") {
+      throw ApiError.badRequest("Job card is cancelled");
+    }
+
+    if (!jobCard.billing) {
+      jobCard.billing = {};
+    }
+
+    const items = Array.isArray(jobCard.jobItems) ? jobCard.jobItems : [];
+    const hasPricedItems = items.some((item) => Number(item?.total || 0) > 0);
+    const grandTotal = Number(jobCard.billing?.grandTotal || 0);
+
+    if (hasPricedItems && grandTotal <= 0) {
+      jobCard.calculateBilling();
+      await jobCard.save();
+    }
+
+    if (!jobCard.billing?.grandTotal || jobCard.billing.grandTotal <= 0) {
+      throw ApiError.badRequest("Invoice not available yet");
+    }
+
+    const createdInvoice = await Invoice.createFromJobCard(jobCard, {
+      generatedBy: req.user._id,
+    });
+    await createdInvoice.populate("customer", "name mobile email");
+    invoice = createdInvoice.toObject();
   }
 
   // Check ownership
