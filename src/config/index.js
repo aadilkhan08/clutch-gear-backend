@@ -91,6 +91,7 @@ const config = {
     maxAttempts: parseInt(process.env.OTP_MAX_ATTEMPTS, 10) || 3,
     resendCooldownSeconds:
       parseInt(process.env.OTP_RESEND_COOLDOWN_SECONDS, 10) || 60,
+    channel: process.env.OTP_CHANNEL || "sms",
   },
 
   // SMS
@@ -105,6 +106,7 @@ const config = {
     authKey: process.env.MSG91_AUTH_KEY || process.env.SMS_API_KEY,
     senderId: process.env.MSG91_SENDER_ID || process.env.SMS_SENDER_ID || "CLUTCH",
     otpTemplateId: process.env.MSG91_OTP_TEMPLATE_ID,
+    whatsappOtpTemplateId: process.env.MSG91_WHATSAPP_OTP_TEMPLATE_ID,
     flowTemplateId: process.env.MSG91_FLOW_TEMPLATE_ID,
     webhookToken: process.env.MSG91_WEBHOOK_TOKEN,
   },

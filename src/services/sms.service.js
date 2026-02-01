@@ -76,9 +76,14 @@ const sendMsg91SMS = async (mobile, message) => {
 /**
  * Send OTP via MSG91 (using Send OTP API)
  */
-const sendMsg91OTP = async (mobile, otp) => {
-  const { authKey, otpTemplateId } = config.msg91;
-  if (!authKey || !otpTemplateId) {
+const sendMsg91OTP = async (mobile, otp, options = {}) => {
+  const { authKey, otpTemplateId, whatsappOtpTemplateId } = config.msg91;
+  const channel = options.channel || "sms";
+  const templateId =
+    options.templateId ||
+    (channel === "whatsapp" ? whatsappOtpTemplateId : otpTemplateId);
+
+  if (!authKey || !templateId) {
     throw new Error("MSG91 auth key or OTP template ID not configured");
   }
 
@@ -92,13 +97,28 @@ const sendMsg91OTP = async (mobile, otp) => {
   console.log("📱 MSG91 OTP Request:", {
     mobile: formattedMobile,
     otp,
-    templateId: otpTemplateId,
+    templateId,
+    channel,
   });
 
   try {
     // Use MSG91 Send OTP API
+    const query = new URLSearchParams({
+      template_id: templateId,
+      mobile: formattedMobile,
+      otp: String(otp),
+    });
+
+    if (config.otp.expiryMinutes) {
+      query.set("otp_expiry", String(config.otp.expiryMinutes));
+    }
+
+    if (channel && channel !== "sms") {
+      query.set("channel", channel);
+    }
+
     const response = await axios.post(
-      `https://control.msg91.com/api/v5/otp?template_id=${otpTemplateId}&mobile=${formattedMobile}&otp=${otp}`,
+      `https://control.msg91.com/api/v5/otp?${query.toString()}`,
       {},
       {
         headers: {
@@ -130,8 +150,13 @@ const sendMsg91OTP = async (mobile, otp) => {
  * Send OTP SMS
  */
 const sendOTP = async (mobile, otp) => {
-  if (config.sms.provider === "msg91") {
-    return await sendMsg91OTP(mobile, otp);
+  const provider = config.sms.provider;
+  const channel = config.otp.channel;
+
+  if (provider === "msg91" || provider === "msg91-whatsapp") {
+    const resolvedChannel =
+      provider === "msg91-whatsapp" ? "whatsapp" : channel || "sms";
+    return await sendMsg91OTP(mobile, otp, { channel: resolvedChannel });
   }
 
   const message = `Your ClutchGear OTP is ${otp}. Valid for ${config.otp.expiryMinutes} minutes. Do not share with anyone.`;

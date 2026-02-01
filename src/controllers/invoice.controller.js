@@ -62,13 +62,21 @@ const getInvoiceByJobCard = asyncHandler(async (req, res) => {
     .lean();
 
   if (!invoice) {
-    const jobCard = await JobCard.findOne({
-      _id: req.params.jobCardId,
-      customer: req.user._id,
-    }).populate("customer", "name mobile email address gstin");
+    const jobCard = await JobCard.findById(req.params.jobCardId).populate(
+      "customer",
+      "name mobile email address gstin"
+    );
 
     if (!jobCard) {
       throw ApiError.notFound("Invoice not found for this job card");
+    }
+
+    const jobCardCustomerId = jobCard.customer?._id || jobCard.customer;
+    if (
+      !jobCardCustomerId ||
+      jobCardCustomerId.toString() !== req.user._id.toString()
+    ) {
+      throw ApiError.forbidden("Access denied");
     }
 
     if (jobCard.status === "cancelled") {
