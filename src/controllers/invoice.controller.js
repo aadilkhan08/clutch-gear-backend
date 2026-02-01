@@ -89,14 +89,42 @@ const getInvoiceByJobCard = asyncHandler(async (req, res) => {
 
     const items = Array.isArray(jobCard.jobItems) ? jobCard.jobItems : [];
     const hasPricedItems = items.some((item) => Number(item?.total || 0) > 0);
-    const grandTotal = Number(jobCard.billing?.grandTotal || 0);
+    let grandTotal = Number(jobCard.billing?.grandTotal || 0);
 
     if (hasPricedItems && grandTotal <= 0) {
       jobCard.calculateBilling();
       await jobCard.save();
+      grandTotal = Number(jobCard.billing?.grandTotal || 0);
     }
 
-    if (!jobCard.billing?.grandTotal || jobCard.billing.grandTotal <= 0) {
+    if (grandTotal <= 0 && jobCard.estimate?.grandTotal > 0) {
+      const estimate = jobCard.estimate;
+
+      if (!items.length && Array.isArray(estimate.items)) {
+        jobCard.jobItems = estimate.items.map((item) => ({
+          type: item.type,
+          description: item.name || item.description || "Service",
+          quantity: item.quantity || 1,
+          unitPrice: item.unitPrice || 0,
+          discount: item.discount || 0,
+          total: item.total || 0,
+          isApproved: true,
+          approvedAt: new Date(),
+        }));
+      }
+
+      jobCard.billing.subtotal = estimate.subtotal || 0;
+      jobCard.billing.discount = estimate.discountAmount || 0;
+      jobCard.billing.discountReason = estimate.discountReason || "";
+      jobCard.billing.taxRate = estimate.taxRate || 0;
+      jobCard.billing.taxAmount = estimate.taxAmount || 0;
+      jobCard.billing.grandTotal = estimate.grandTotal || 0;
+
+      await jobCard.save();
+      grandTotal = Number(jobCard.billing?.grandTotal || 0);
+    }
+
+    if (!grandTotal || grandTotal <= 0) {
       throw ApiError.badRequest("Invoice not available yet");
     }
 
