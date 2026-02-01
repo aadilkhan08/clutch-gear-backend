@@ -374,8 +374,8 @@ const generateInvoicePDFFromInvoice = async (data) => {
           item.type === "part"
             ? "🔧"
             : item.type === "labour"
-            ? "👨‍🔧"
-            : "🛠️";
+              ? "👨‍🔧"
+              : "🛠️";
 
         doc
           .fontSize(10)
@@ -523,8 +523,7 @@ const generateInvoicePDFFromInvoice = async (data) => {
             .fillColor(mutedColor)
             .font("Helvetica")
             .text(
-              `${new Date(payment.createdAt).toLocaleDateString("en-IN")} - ${
-                payment.paymentMethod || "Online"
+              `${new Date(payment.createdAt).toLocaleDateString("en-IN")} - ${payment.paymentMethod || "Online"
               }`,
               50,
               yPos
