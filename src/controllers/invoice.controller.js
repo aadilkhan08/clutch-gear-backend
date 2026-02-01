@@ -876,7 +876,7 @@ const verifyPayment = asyncHandler(async (req, res) => {
   const paidAmount = razorpayPayment.amount / 100; // Convert from paise
 
   // Determine payment method
-  let paymentMethod = "online";
+  let paymentMethod = "other";
   if (razorpayPayment.method === "upi") {
     paymentMethod = "upi";
   } else if (razorpayPayment.method === "card") {
@@ -891,13 +891,19 @@ const verifyPayment = asyncHandler(async (req, res) => {
   const paymentCount = await Payment.countDocuments();
   const paymentNumber = `PAY${String(paymentCount + 1).padStart(6, "0")}`;
 
+  const remainingBeforePayment = Math.max(
+    0,
+    Number(invoice.grandTotal || 0) - Number(invoice.paidAmount || 0)
+  );
+  const paymentType = paidAmount >= remainingBeforePayment ? "full" : "partial";
+
   // Create payment record
   const payment = await Payment.create({
     paymentNumber,
     customer: req.user._id,
     jobCard: invoice.jobCard._id || invoice.jobCard,
     amount: paidAmount,
-    paymentType: "service",
+    paymentType,
     paymentMethod,
     status: "completed",
     transactionId: razorpay_payment_id,
