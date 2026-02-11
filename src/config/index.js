@@ -111,6 +111,11 @@ const config = {
     webhookToken: process.env.MSG91_WEBHOOK_TOKEN,
   },
 
+  // Fast2SMS
+  fast2sms: {
+    apiKey: process.env.FAST2SMS_API_KEY,
+  },
+
   // ImageKit
   imagekit: {
     publicKey: process.env.IMAGEKIT_PUBLIC_KEY,

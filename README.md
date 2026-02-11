@@ -304,6 +304,7 @@ Currently supports:
 - `console` - Development (logs to console)
 - `twilio` - Twilio SMS
 - `msg91` - MSG91 SMS
+- `fast2sms` - Fast2SMS (India)
 
 Set `SMS_PROVIDER` in `.env` to configure.
 

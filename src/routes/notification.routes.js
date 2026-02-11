@@ -61,4 +61,8 @@ router.get("/:id", getNotification);
 // @desc    Delete a notification
 router.delete("/:id", deleteNotification);
 
+// @route   POST /api/v1/notifications/test
+// @desc    Send a test push notification to current user
+router.post("/test", require("../controllers/notification.controller").sendTestNotification);
+
 module.exports = router;

@@ -200,6 +200,65 @@ const unregisterToken = asyncHandler(async (req, res) => {
   ApiResponse.success(res, "FCM token unregistered");
 });
 
+/**
+ * @desc    Send a test push notification
+ * @route   POST /api/v1/notifications/test
+ * @access  Private/Customer
+ */
+const sendTestNotification = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select("deviceInfo name");
+
+  if (!user.deviceInfo?.fcmToken) {
+    throw ApiError.badRequest(
+      "No FCM token registered for this device. Please enable push notifications in the app."
+    );
+  }
+
+  const fcmService = require("../services/fcm.service");
+  const notificationService = require("../services/notification.service");
+
+  // Create test notification record
+  const notification = await notificationService.sendNotification({
+    customerId: req.user._id,
+    type: "GENERAL",
+    title: "🔔 Test Notification",
+    body: `Hello ${user.name || "there"}! Push notifications are working correctly.`,
+    data: {
+      screen: "notifications",
+      params: {},
+    },
+    sendPush: true,
+    sendSms: false,
+  });
+
+  // Also send via FCM directly for debugging
+  const fcmResult = await fcmService.sendToDevice(
+    user.deviceInfo.fcmToken,
+    {
+      title: "🧪 FCM Direct Test",
+      body: "This is a direct FCM test message to verify token registration.",
+    },
+    {
+      type: "TEST",
+      timestamp: Date.now().toString(),
+    }
+  );
+
+  ApiResponse.success(res, "Test notification sent", {
+    notification: notification ? {
+      id: notification._id,
+      title: notification.title,
+      pushStatus: notification.pushStatus,
+    } : null,
+    directFcm: fcmResult,
+    deviceInfo: {
+      tokenPrefix: user.deviceInfo.fcmToken?.substring(0, 30) + "...",
+      deviceType: user.deviceInfo.deviceType,
+      tokenUpdatedAt: user.deviceInfo.fcmTokenUpdatedAt,
+    },
+  });
+});
+
 module.exports = {
   getNotifications,
   getUnreadCount,
@@ -211,4 +270,5 @@ module.exports = {
   updatePreferences,
   registerToken,
   unregisterToken,
+  sendTestNotification,
 };

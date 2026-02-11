@@ -24,6 +24,9 @@ const sendSMS = async (mobile, message) => {
       case "msg91":
         return await sendMsg91SMS(mobile, message);
 
+      case "fast2sms":
+        return await sendFast2SmsSMS(mobile, message);
+
       default:
         console.log("📱 SMS (Default):", { to: mobile, message });
         return { success: true, provider: "default" };
@@ -147,6 +150,116 @@ const sendMsg91OTP = async (mobile, otp, options = {}) => {
 };
 
 /**
+ * Send SMS via Fast2SMS (Quick SMS route)
+ */
+const sendFast2SmsSMS = async (mobile, message) => {
+  const { apiKey } = config.fast2sms;
+  if (!apiKey) {
+    throw new Error("Fast2SMS API key not configured");
+  }
+
+  // Format mobile number - Fast2SMS expects 10 digit number without country code
+  let formattedMobile = mobile.replace(/\D/g, "");
+  if (formattedMobile.startsWith("91") && formattedMobile.length === 12) {
+    formattedMobile = formattedMobile.slice(2);
+  }
+
+  console.log("📱 Fast2SMS SMS Request:", {
+    mobile: formattedMobile,
+    message,
+  });
+
+  try {
+    const response = await axios.post(
+      "https://www.fast2sms.com/dev/bulkV2",
+      {
+        route: "q", // Quick SMS route
+        message,
+        flash: 0,
+        numbers: formattedMobile,
+      },
+      {
+        headers: {
+          authorization: apiKey,
+          "Content-Type": "application/json",
+        },
+        timeout: 15000,
+      }
+    );
+
+    console.log("✅ Fast2SMS SMS Response:", response.data);
+
+    return {
+      success: response.data.return === true,
+      provider: "fast2sms",
+      response: response.data,
+    };
+  } catch (error) {
+    console.error("❌ Fast2SMS SMS Error:", {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+    });
+    throw error;
+  }
+};
+
+/**
+ * Send OTP via Fast2SMS (using OTP route)
+ */
+const sendFast2SmsOTP = async (mobile, otp) => {
+  const { apiKey } = config.fast2sms;
+  if (!apiKey) {
+    throw new Error("Fast2SMS API key not configured");
+  }
+
+  // Format mobile number - Fast2SMS expects 10 digit number without country code
+  let formattedMobile = mobile.replace(/\D/g, "");
+  if (formattedMobile.startsWith("91") && formattedMobile.length === 12) {
+    formattedMobile = formattedMobile.slice(2);
+  }
+
+  console.log("📱 Fast2SMS OTP Request:", {
+    mobile: formattedMobile,
+    otp,
+  });
+
+  try {
+    const response = await axios.post(
+      "https://www.fast2sms.com/dev/bulkV2",
+      {
+        route: "otp",
+        variables_values: String(otp),
+        flash: 0,
+        numbers: formattedMobile,
+      },
+      {
+        headers: {
+          authorization: apiKey,
+          "Content-Type": "application/json",
+        },
+        timeout: 15000,
+      }
+    );
+
+    console.log("✅ Fast2SMS OTP Response:", response.data);
+
+    return {
+      success: response.data.return === true,
+      provider: "fast2sms",
+      response: response.data,
+    };
+  } catch (error) {
+    console.error("❌ Fast2SMS OTP Error:", {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+    });
+    throw error;
+  }
+};
+
+/**
  * Send OTP SMS
  */
 const sendOTP = async (mobile, otp) => {
@@ -157,6 +270,10 @@ const sendOTP = async (mobile, otp) => {
     const resolvedChannel =
       provider === "msg91-whatsapp" ? "whatsapp" : channel || "sms";
     return await sendMsg91OTP(mobile, otp, { channel: resolvedChannel });
+  }
+
+  if (provider === "fast2sms") {
+    return await sendFast2SmsOTP(mobile, otp);
   }
 
   const message = `Your ClutchGear OTP is ${otp}. Valid for ${config.otp.expiryMinutes} minutes. Do not share with anyone.`;
