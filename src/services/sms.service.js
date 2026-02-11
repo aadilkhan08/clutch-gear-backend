@@ -225,11 +225,12 @@ const sendFast2SmsOTP = async (mobile, otp) => {
   });
 
   try {
+    // Use Quick SMS route as fallback (OTP route requires website verification on Fast2SMS)
     const response = await axios.post(
       "https://www.fast2sms.com/dev/bulkV2",
       {
-        route: "otp",
-        variables_values: String(otp),
+        route: "q",
+        message: `Your ClutchGear OTP is ${otp}. Valid for ${config.otp.expiryMinutes} minutes. Do not share with anyone.`,
         flash: 0,
         numbers: formattedMobile,
       },
