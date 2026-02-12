@@ -8,8 +8,6 @@ const {
   authenticate,
   verifyRefreshToken,
   validate,
-  otpLimiter,
-  authLimiter,
 } = require("../middlewares");
 const {
   sendOtpValidation,
@@ -20,21 +18,18 @@ const {
 // Public routes
 router.post(
   "/send-otp",
-  otpLimiter,
   sendOtpValidation,
   validate,
   authController.sendOTP
 );
 router.post(
   "/verify-otp",
-  authLimiter,
   verifyOtpValidation,
   validate,
   authController.verifyOTP
 );
 router.post(
   "/resend-otp",
-  otpLimiter,
   sendOtpValidation,
   validate,
   authController.resendOTP

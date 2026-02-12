@@ -26,13 +26,6 @@ const {
   notFoundHandler,
   mongoErrorHandler,
 } = require("./error.middleware");
-const {
-  apiLimiter,
-  authLimiter,
-  otpLimiter,
-  uploadLimiter,
-} = require("./rateLimiter.middleware");
-
 module.exports = {
   // Auth
   authenticate,
@@ -58,9 +51,4 @@ module.exports = {
   notFoundHandler,
   mongoErrorHandler,
 
-  // Rate Limiting
-  apiLimiter,
-  authLimiter,
-  otpLimiter,
-  uploadLimiter,
 };

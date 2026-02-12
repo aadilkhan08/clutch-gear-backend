@@ -337,9 +337,8 @@ const verifyPaymentAndActivate = asyncHandler(async (req, res) => {
   try {
     await fcmService.sendToUser(req.user._id, {
       title: "Subscription Activated! 🎉",
-      body: `Your ${
-        subscription.package.name
-      } subscription is now active until ${subscription.endDate.toLocaleDateString()}`,
+      body: `Your ${subscription.package.name
+        } subscription is now active until ${subscription.endDate.toLocaleDateString()}`,
       data: {
         type: "subscription_activated",
         subscriptionId: subscription._id.toString(),
@@ -682,9 +681,8 @@ const cancelSubscription = asyncHandler(async (req, res) => {
   try {
     await fcmService.sendToUser(subscription.customer, {
       title: "Subscription Cancelled",
-      body: `Your subscription has been cancelled. ${
-        refundAmount > 0 ? `Refund of ₹${refundAmount} will be processed.` : ""
-      }`,
+      body: `Your subscription has been cancelled. ${refundAmount > 0 ? `Refund of ₹${refundAmount} will be processed.` : ""
+        }`,
       data: {
         type: "subscription_cancelled",
         subscriptionId: subscription._id.toString(),

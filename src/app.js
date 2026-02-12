@@ -10,7 +10,6 @@ const mongoSanitize = require("express-mongo-sanitize");
 const config = require("./config");
 const routes = require("./routes");
 const {
-  apiLimiter,
   errorConverter,
   mongoErrorHandler,
   errorHandler,
@@ -19,9 +18,6 @@ const {
 
 // Create Express app
 const app = express();
-
-// Trust proxy (for rate limiting behind reverse proxy)
-app.set("trust proxy", 1);
 
 // Security headers
 app.use(helmet());
@@ -68,9 +64,6 @@ if (config.env === "development") {
 } else {
   app.use(morgan("combined"));
 }
-
-// Rate limiting
-app.use("/api", apiLimiter);
 
 // API routes
 app.use(`/api/${config.apiVersion}`, routes);

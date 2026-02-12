@@ -651,10 +651,10 @@ const verifyRazorpayPaymentNativeUser = asyncHandler(async (req, res) => {
       paymentType: payment.paymentType,
       jobCard: payment.jobCard
         ? {
-            _id: payment.jobCard._id,
-            jobNumber: payment.jobCard.jobNumber,
-            vehicleSnapshot: payment.jobCard.vehicleSnapshot,
-          }
+          _id: payment.jobCard._id,
+          jobNumber: payment.jobCard.jobNumber,
+          vehicleSnapshot: payment.jobCard.vehicleSnapshot,
+        }
         : null,
       createdAt: payment.createdAt,
     },

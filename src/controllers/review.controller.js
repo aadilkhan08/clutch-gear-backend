@@ -192,7 +192,7 @@ const createReview = asyncHandler(async (req, res) => {
   await review.populate("jobCard", "jobNumber vehicleSnapshot");
 
   ApiResponse.created(res, "Review submitted successfully", review);
-  updateGarageRatingSummary().catch(() => {});
+  updateGarageRatingSummary().catch(() => { });
 });
 
 /**
@@ -234,7 +234,7 @@ const updateReview = asyncHandler(async (req, res) => {
   await review.save();
 
   ApiResponse.success(res, "Review updated successfully", review);
-  updateGarageRatingSummary().catch(() => {});
+  updateGarageRatingSummary().catch(() => { });
 });
 
 /**
@@ -253,7 +253,7 @@ const deleteReview = asyncHandler(async (req, res) => {
   }
 
   ApiResponse.success(res, "Review deleted successfully");
-  updateGarageRatingSummary().catch(() => {});
+  updateGarageRatingSummary().catch(() => { });
 });
 
 /**
@@ -429,7 +429,7 @@ const toggleVisibility = asyncHandler(async (req, res) => {
     `Review ${newStatus === "APPROVED" ? "published" : "hidden"} successfully`,
     review
   );
-  updateGarageRatingSummary().catch(() => {});
+  updateGarageRatingSummary().catch(() => { });
 });
 
 /**
@@ -464,7 +464,7 @@ const updateReviewStatus = asyncHandler(async (req, res) => {
   await review.save();
 
   ApiResponse.success(res, `Review status updated to ${status}`, review);
-  updateGarageRatingSummary().catch(() => {});
+  updateGarageRatingSummary().catch(() => { });
 });
 
 /**

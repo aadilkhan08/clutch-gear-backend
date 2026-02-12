@@ -5,7 +5,7 @@ const express = require("express");
 const multer = require("multer");
 const router = express.Router();
 const { uploadController } = require("../controllers");
-const { authenticate, uploadLimiter } = require("../middlewares");
+const { authenticate } = require("../middlewares");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -21,7 +21,6 @@ const upload = multer({
 
 // All routes require authentication
 router.use(authenticate);
-router.use(uploadLimiter);
 
 // Upload routes
 router.get("/auth", uploadController.getUploadAuth);
