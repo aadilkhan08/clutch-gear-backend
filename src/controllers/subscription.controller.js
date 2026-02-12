@@ -210,9 +210,7 @@ const purchasePackage = asyncHandler(async (req, res) => {
     },
   });
 
-  // Update package subscription count
-  pkg.currentSubscriptions += 1;
-  await pkg.save();
+  // Note: subscription count will be incremented upon activation (payment verification)
 
   await subscription.populate([
     { path: "package", select: "name code type image" },
@@ -325,6 +323,15 @@ const verifyPaymentAndActivate = asyncHandler(async (req, res) => {
   subscription.payment.method = "online";
   subscription.activatedBy = req.user._id;
   await subscription.save();
+
+  // Increment package subscription count now that payment is confirmed
+  try {
+    await Package.findByIdAndUpdate(subscription.package, {
+      $inc: { currentSubscriptions: 1 },
+    });
+  } catch (countErr) {
+    console.error("Failed to increment subscription count:", countErr);
+  }
 
   // Send notification
   try {
@@ -600,6 +607,15 @@ const activateSubscription = asyncHandler(async (req, res) => {
   subscription.activatedBy = req.user._id;
   subscription.notes = notes;
   await subscription.save();
+
+  // Increment package subscription count now that payment is confirmed
+  try {
+    await Package.findByIdAndUpdate(subscription.package, {
+      $inc: { currentSubscriptions: 1 },
+    });
+  } catch (countErr) {
+    console.error("Failed to increment subscription count:", countErr);
+  }
 
   // Send notification
   try {

@@ -201,7 +201,7 @@ const createReview = asyncHandler(async (req, res) => {
  * @access  Private
  */
 const updateReview = asyncHandler(async (req, res) => {
-  const { rating, title, comment } = req.body;
+  const { rating, title, comment, serviceQuality, timelinessRating, valueForMoney } = req.body;
 
   const review = await Review.findOne({
     _id: req.params.id,
@@ -224,6 +224,9 @@ const updateReview = asyncHandler(async (req, res) => {
   if (rating) review.rating = rating;
   if (title !== undefined) review.title = sanitizeText(title);
   if (comment !== undefined) review.comment = sanitizeText(comment);
+  if (serviceQuality) review.serviceQuality = serviceQuality;
+  if (timelinessRating) review.timelinessRating = timelinessRating;
+  if (valueForMoney) review.valueForMoney = valueForMoney;
 
   review.moderationLogs = review.moderationLogs || [];
   review.moderationLogs.push({ action: "UPDATED", actor: req.userId });

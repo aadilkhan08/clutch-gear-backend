@@ -3,7 +3,7 @@
  * Handles payment operations
  */
 const { Payment, JobCard, User } = require("../models");
-const { pdfService, fcmService } = require("../services");
+const { pdfService, fcmService, notificationService } = require("../services");
 const {
   getRazorpayClient,
   getRazorpayKeyId,
@@ -492,6 +492,13 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
   payment.checkout = undefined;
   await payment.save();
 
+  // Send payment success notification
+  try {
+    await notificationService.sendPaymentSuccess(payment.customer, payment);
+  } catch (notifError) {
+    console.error("Payment notification failed:", notifError);
+  }
+
   ApiResponse.success(res, "Payment verified", {
     paymentId: payment._id,
     status: payment.status,
@@ -552,6 +559,13 @@ const verifyRazorpayPaymentNative = asyncHandler(async (req, res) => {
   };
   payment.checkout = undefined;
   await payment.save();
+
+  // Send payment success notification
+  try {
+    await notificationService.sendPaymentSuccess(payment.customer, payment);
+  } catch (notifError) {
+    console.error("Payment notification failed:", notifError);
+  }
 
   ApiResponse.success(res, "Payment verified and completed", {
     paymentId: payment._id,
@@ -618,6 +632,13 @@ const verifyRazorpayPaymentNativeUser = asyncHandler(async (req, res) => {
   };
   payment.checkout = undefined;
   await payment.save();
+
+  // Send payment success notification
+  try {
+    await notificationService.sendPaymentSuccess(payment.customer, payment);
+  } catch (notifError) {
+    console.error("Payment notification failed:", notifError);
+  }
 
   ApiResponse.success(res, "Payment verified and completed", {
     payment: {
@@ -737,17 +758,12 @@ const createPayment = asyncHandler(async (req, res) => {
     { path: "jobCard", select: "jobNumber vehicleSnapshot" },
   ]);
 
-  // Send push notification for payment confirmation (completed only)
+  // Send notification for payment confirmation (completed only)
   if (payment.status === "completed") {
     try {
-      const customer = await User.findById(jobCard.customer)
-        .select("deviceInfo")
-        .lean();
-      if (customer) {
-        await fcmService.notifyPaymentReceived(customer, payment);
-      }
+      await notificationService.sendPaymentSuccess(jobCard.customer, payment);
     } catch (error) {
-      console.error("Push notification for payment failed:", error);
+      console.error("Payment notification failed:", error);
     }
   }
 
