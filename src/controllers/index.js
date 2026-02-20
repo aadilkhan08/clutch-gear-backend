@@ -25,6 +25,9 @@ const serviceScheduleController = require("./serviceSchedule.controller");
 const advancedPaymentController = require("./advancedPayment.controller");
 const invoiceController = require("./invoice.controller");
 const webhookController = require("./webhook.controller");
+const promotionController = require("./promotion.controller");
+const vehicleCatalogController = require("./vehicleCatalog.controller");
+const partnerController = require("./partner.controller");
 
 module.exports = {
   authController,
@@ -50,4 +53,7 @@ module.exports = {
   advancedPaymentController,
   invoiceController,
   webhookController,
+  promotionController,
+  vehicleCatalogController,
+  partnerController,
 };

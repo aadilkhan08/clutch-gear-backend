@@ -33,6 +33,15 @@ const Area = require("./area.model");
 // Notifications
 const Notification = require("./notification.model");
 
+// Promotions
+const Promotion = require("./promotion.model");
+
+// Vehicle Catalog
+const VehicleCatalog = require("./vehicleCatalog.model");
+
+// Partners
+const Partner = require("./partner.model");
+
 module.exports = {
   User,
   OTP,
@@ -61,4 +70,10 @@ module.exports = {
   Area,
   // Notifications
   Notification,
+  // Promotions
+  Promotion,
+  // Vehicle Catalog
+  VehicleCatalog,
+  // Partners
+  Partner,
 };

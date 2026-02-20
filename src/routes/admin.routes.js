@@ -20,6 +20,8 @@ const {
   couponController,
   insuranceJobController,
   invoiceController,
+  promotionController,
+  partnerController,
 } = require("../controllers");
 const {
   authenticate,
@@ -66,6 +68,12 @@ const {
   activateSubscriptionValidation,
   cancelSubscriptionValidation,
   extendSubscriptionValidation,
+  createPromotionValidation,
+  updatePromotionValidation,
+  listPromotionValidation,
+  createPartnerValidation,
+  updatePartnerValidation,
+  listPartnerValidation,
 } = require("../validators");
 
 // Image upload config
@@ -639,6 +647,79 @@ router.post(
   "/jobcards/:id/generate-invoice",
   validateObjectId("id"),
   invoiceController.generateInvoiceFromJobCard,
+);
+
+// ============ Promotion Management ============
+router.get(
+  "/promotions",
+  listPromotionValidation,
+  validate,
+  promotionController.listPromotions,
+);
+router.get("/promotions/analytics", promotionController.getPromotionAnalytics);
+router.get(
+  "/promotions/:id",
+  validateObjectId("id"),
+  promotionController.getPromotion,
+);
+router.post(
+  "/promotions",
+  createPromotionValidation,
+  validate,
+  promotionController.createPromotion,
+);
+router.put(
+  "/promotions/:id",
+  validateObjectId("id"),
+  updatePromotionValidation,
+  validate,
+  promotionController.updatePromotion,
+);
+router.put(
+  "/promotions/:id/toggle",
+  validateObjectId("id"),
+  promotionController.togglePromotion,
+);
+router.delete(
+  "/promotions/:id",
+  validateObjectId("id"),
+  promotionController.deletePromotion,
+);
+
+// ============ Partner Management ============
+router.get(
+  "/partners",
+  listPartnerValidation,
+  validate,
+  partnerController.listPartners,
+);
+router.get(
+  "/partners/:id",
+  validateObjectId("id"),
+  partnerController.getPartner,
+);
+router.post(
+  "/partners",
+  createPartnerValidation,
+  validate,
+  partnerController.createPartner,
+);
+router.put(
+  "/partners/:id",
+  validateObjectId("id"),
+  updatePartnerValidation,
+  validate,
+  partnerController.updatePartner,
+);
+router.put(
+  "/partners/:id/toggle",
+  validateObjectId("id"),
+  partnerController.togglePartner,
+);
+router.delete(
+  "/partners/:id",
+  validateObjectId("id"),
+  partnerController.deletePartner,
 );
 
 module.exports = router;

@@ -8,6 +8,7 @@ const imagekitService = require("./imagekit.service");
 const fcmService = require("./fcm.service");
 const pdfService = require("./pdf.service");
 const notificationService = require("./notification.service");
+const jobcardService = require("./jobcard.service");
 
 module.exports = {
   smsService,
@@ -16,4 +17,5 @@ module.exports = {
   fcmService,
   pdfService,
   notificationService,
+  jobcardService,
 };

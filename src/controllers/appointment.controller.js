@@ -10,7 +10,7 @@ const {
   User,
   Garage,
 } = require("../models");
-const { smsService, fcmService, notificationService } = require("../services");
+const { smsService, fcmService, notificationService, jobcardService } = require("../services");
 const {
   ApiResponse,
   ApiError,
@@ -117,9 +117,9 @@ const createAppointment = asyncHandler(async (req, res) => {
 
   const pickupFee = pickupRequired
     ? Math.max(
-        0,
-        ...serviceDetails.map((service) => Number(service.pickupPrice || 0)),
-      )
+      0,
+      ...serviceDetails.map((service) => Number(service.pickupPrice || 0)),
+    )
     : 0;
 
   // Check slot availability
@@ -169,16 +169,16 @@ const createAppointment = asyncHandler(async (req, res) => {
   const garage = await Garage.findOne({ isActive: true }).lean();
   const workshopSnapshot = garage
     ? {
-        name: garage.name,
-        address: {
-          street: garage.address?.street,
-          landmark: garage.address?.landmark,
-          city: garage.address?.city,
-          state: garage.address?.state,
-          pincode: garage.address?.pincode,
-        },
-        phone: garage.contact?.phone,
-      }
+      name: garage.name,
+      address: {
+        street: garage.address?.street,
+        landmark: garage.address?.landmark,
+        city: garage.address?.city,
+        state: garage.address?.state,
+        pincode: garage.address?.pincode,
+      },
+      phone: garage.contact?.phone,
+    }
     : undefined;
 
   // Create appointment
@@ -224,6 +224,17 @@ const createAppointment = asyncHandler(async (req, res) => {
     }
   } catch (error) {
     console.error("Push notification to admins failed:", error);
+  }
+
+  // Auto-create job card from the confirmed appointment
+  let jobCard;
+  try {
+    jobCard = await jobcardService.createJobCardFromAppointment(appointment);
+    // Re-populate so the response includes the jobCard reference
+    appointment.jobCard = jobCard._id;
+  } catch (error) {
+    console.error("Auto job card creation failed:", error);
+    // Non-blocking – appointment is still valid without a job card
   }
 
   ApiResponse.created(res, "Appointment booked successfully", appointment);

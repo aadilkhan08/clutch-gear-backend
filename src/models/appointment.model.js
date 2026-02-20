@@ -98,6 +98,10 @@ const appointmentSchema = new mongoose.Schema(
       pincode: String,
       landmark: String,
     },
+    jobCard: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "JobCard",
+    },
     cancelledBy: {
       type: String,
       enum: ["customer", "admin"],
