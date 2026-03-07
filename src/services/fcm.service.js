@@ -3,9 +3,28 @@
  * Sends push notifications via Expo's push notification service.
  * Tokens stored as Expo Push Tokens (ExponentPushToken[xxx]).
  */
-const { Expo } = require("expo-server-sdk");
 
-const expo = new Expo();
+// expo-server-sdk is ESM-only; lazy-load via dynamic import()
+let _expo = null;
+let _Expo = null;
+
+const getExpo = async () => {
+  if (_expo) return { expo: _expo, Expo: _Expo };
+  const mod = await import("expo-server-sdk");
+  _Expo = mod.Expo;
+  _expo = new _Expo();
+  return { expo: _expo, Expo: _Expo };
+};
+
+/**
+ * Check if a token looks like an Expo push token (sync fallback)
+ */
+const isExpoPushToken = (token) => {
+  if (!token || typeof token !== "string") return false;
+  return (
+    token.startsWith("ExponentPushToken[") || token.startsWith("ExpoPushToken[")
+  );
+};
 
 /**
  * Send push notification to a single device
@@ -19,7 +38,7 @@ const sendToDevice = async (pushToken, notification, data = {}) => {
     return { success: false, error: "No token" };
   }
 
-  if (!Expo.isExpoPushToken(pushToken)) {
+  if (!isExpoPushToken(pushToken)) {
     console.warn(
       `[Push] Invalid Expo push token: ${pushToken?.substring(0, 30)}...`
     );
@@ -27,6 +46,7 @@ const sendToDevice = async (pushToken, notification, data = {}) => {
   }
 
   try {
+    const { expo } = await getExpo();
     const message = {
       to: pushToken,
       sound: "default",
@@ -73,13 +93,14 @@ const sendToMultipleDevices = async (pushTokens, notification, data = {}) => {
   }
 
   // Filter to valid Expo push tokens only
-  const validTokens = pushTokens.filter((t) => Expo.isExpoPushToken(t));
+  const validTokens = pushTokens.filter((t) => isExpoPushToken(t));
   if (validTokens.length === 0) {
     console.warn("[Push] No valid Expo push tokens in batch");
     return { success: false, error: "No valid tokens", successCount: 0, failureCount: pushTokens.length };
   }
 
   try {
+    const { expo } = await getExpo();
     const messages = validTokens.map((token) => ({
       to: token,
       sound: "default",
