@@ -210,11 +210,11 @@ const sendTestNotification = asyncHandler(async (req, res) => {
 
   if (!user.deviceInfo?.fcmToken) {
     throw ApiError.badRequest(
-      "No FCM token registered for this device. Please enable push notifications in the app."
+      "No push token registered for this device. Please enable push notifications in the app."
     );
   }
 
-  const fcmService = require("../services/fcm.service");
+  const pushService = require("../services/fcm.service");
   const notificationService = require("../services/notification.service");
 
   // Create test notification record
@@ -231,12 +231,12 @@ const sendTestNotification = asyncHandler(async (req, res) => {
     sendSms: false,
   });
 
-  // Also send via FCM directly for debugging
-  const fcmResult = await fcmService.sendToDevice(
+  // Also send directly for debugging
+  const directResult = await pushService.sendToDevice(
     user.deviceInfo.fcmToken,
     {
-      title: "🧪 FCM Direct Test",
-      body: "This is a direct FCM test message to verify token registration.",
+      title: "🧪 Push Direct Test",
+      body: "This is a direct test message to verify token registration.",
     },
     {
       type: "TEST",
@@ -250,7 +250,7 @@ const sendTestNotification = asyncHandler(async (req, res) => {
       title: notification.title,
       pushStatus: notification.pushStatus,
     } : null,
-    directFcm: fcmResult,
+    directPush: directResult,
     deviceInfo: {
       tokenPrefix: user.deviceInfo.fcmToken?.substring(0, 30) + "...",
       deviceType: user.deviceInfo.deviceType,

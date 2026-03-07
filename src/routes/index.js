@@ -33,6 +33,8 @@ const webhookRoutes = require("./webhook.routes");
 const promotionRoutes = require("./promotion.routes");
 const vehicleCatalogRoutes = require("./vehicleCatalog.routes");
 const partnerRoutes = require("./partner.routes");
+const bannerRoutes = require("./banner.routes");
+const testimonialRoutes = require("./testimonial.routes");
 
 // Health check
 router.get("/health", (req, res) => {
@@ -72,5 +74,7 @@ router.use("/webhooks", webhookRoutes);
 router.use("/promotions", promotionRoutes);
 router.use("/vehicle-catalog", vehicleCatalogRoutes);
 router.use("/partners", partnerRoutes);
+router.use("/banners", bannerRoutes);
+router.use("/testimonials", testimonialRoutes);
 
 module.exports = router;

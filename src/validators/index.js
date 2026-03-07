@@ -22,6 +22,9 @@ const serviceScheduleValidator = require("./serviceSchedule.validator");
 const advancedPaymentValidator = require("./advancedPayment.validator");
 const promotionValidator = require("./promotion.validator");
 const partnerValidator = require("./partner.validator");
+const mechanicValidator = require("./mechanic.validator");
+const bannerValidator = require("./banner.validator");
+const testimonialValidator = require("./testimonial.validator");
 
 module.exports = {
   ...authValidator,
@@ -44,4 +47,7 @@ module.exports = {
   ...advancedPaymentValidator,
   ...promotionValidator,
   ...partnerValidator,
+  ...mechanicValidator,
+  ...bannerValidator,
+  ...testimonialValidator,
 };

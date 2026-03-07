@@ -37,6 +37,10 @@ const vehicleSchema = new mongoose.Schema(
       required: [true, "Model is required"],
       trim: true,
     },
+    variant: {
+      type: String,
+      trim: true,
+    },
     year: {
       type: Number,
       min: [1900, "Invalid year"],

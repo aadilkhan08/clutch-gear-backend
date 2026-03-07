@@ -252,6 +252,18 @@ const deleteReview = asyncHandler(async (req, res) => {
     throw ApiError.notFound("Review not found");
   }
 
+  // Clean up ImageKit files
+  if (review.images && review.images.length > 0) {
+    const fileIds = review.images
+      .map((img) => img.fileId)
+      .filter(Boolean);
+    if (fileIds.length > 0) {
+      imagekitService.deleteMultipleImages(fileIds).catch((err) =>
+        console.error("ImageKit cleanup (review images):", err.message)
+      );
+    }
+  }
+
   ApiResponse.success(res, "Review deleted successfully");
   updateGarageRatingSummary().catch(() => { });
 });

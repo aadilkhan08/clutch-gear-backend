@@ -408,6 +408,45 @@ const listMechanics = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Create mechanic (Admin)
+ * @route   POST /api/v1/admin/mechanics
+ * @access  Private/Admin
+ */
+const createMechanic = asyncHandler(async (req, res) => {
+  const { name, mobile, email } = req.body;
+
+  // Check if user already exists with this mobile
+  let user = await User.findOne({ mobile });
+
+  if (user) {
+    if (user.role === "mechanic") {
+      throw ApiError.badRequest("A mechanic with this mobile number already exists");
+    }
+    if (user.role === "admin" || user.role === "superadmin") {
+      throw ApiError.badRequest("Cannot convert an admin/superadmin to mechanic");
+    }
+    // Promote existing user to mechanic
+    user.role = "mechanic";
+    if (name && !user.name) user.name = name;
+    if (email && !user.email) user.email = email;
+    await user.save();
+  } else {
+    // Create new mechanic user
+    user = await User.create({
+      name: name || `Mechanic ${mobile.slice(-4)}`,
+      mobile,
+      email: email || undefined,
+      role: "mechanic",
+      isVerified: true,
+      isActive: true,
+      isProfileComplete: !!name,
+    });
+  }
+
+  ApiResponse.created(res, "Mechanic created successfully", user);
+});
+
+/**
  * @desc    Get mechanic details (Admin)
  * @route   GET /api/v1/admin/mechanics/:id
  * @access  Private/Admin
@@ -876,6 +915,7 @@ module.exports = {
   updateUserRole,
   getAllCustomers,
   listMechanics,
+  createMechanic,
   getMechanic,
   createAdminUser,
   getTimeSlots,

@@ -74,6 +74,10 @@ const carWashSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    remarks: {
+      type: String,
+      trim: true,
+    },
     customerFeedback: {
       rating: { type: Number, min: 1, max: 5 },
       comment: String,

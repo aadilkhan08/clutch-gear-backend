@@ -28,6 +28,8 @@ const webhookController = require("./webhook.controller");
 const promotionController = require("./promotion.controller");
 const vehicleCatalogController = require("./vehicleCatalog.controller");
 const partnerController = require("./partner.controller");
+const bannerController = require("./banner.controller");
+const testimonialController = require("./testimonial.controller");
 
 module.exports = {
   authController,
@@ -56,4 +58,6 @@ module.exports = {
   promotionController,
   vehicleCatalogController,
   partnerController,
+  bannerController,
+  testimonialController,
 };

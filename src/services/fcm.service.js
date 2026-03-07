@@ -1,240 +1,154 @@
 /**
- * FCM (Firebase Cloud Messaging) Service
- * Push notification management
+ * Push Notification Service (Expo Push API)
+ * Sends push notifications via Expo's push notification service.
+ * Tokens stored as Expo Push Tokens (ExponentPushToken[xxx]).
  */
-const config = require("../config");
+const { Expo } = require("expo-server-sdk");
 
-// Try to load firebase-admin (optional dependency)
-let admin = null;
-try {
-  admin = require("firebase-admin");
-} catch (err) {
-  console.warn(
-    "firebase-admin not installed. Push notifications will be mocked."
-  );
-}
-
-// Initialize Firebase Admin SDK
-let firebaseInitialized = false;
-
-const initializeFirebase = () => {
-  if (firebaseInitialized || !admin) return;
-
-  try {
-    if (config.firebase?.serviceAccount) {
-      admin.initializeApp({
-        credential: admin.credential.cert(config.firebase.serviceAccount),
-      });
-      firebaseInitialized = true;
-      console.log("Firebase Admin SDK initialized successfully");
-    } else {
-      console.warn(
-        "Firebase service account not configured. Push notifications disabled."
-      );
-    }
-  } catch (error) {
-    console.error("Failed to initialize Firebase:", error.message);
-  }
-};
-
-// Initialize on module load
-initializeFirebase();
+const expo = new Expo();
 
 /**
  * Send push notification to a single device
- * @param {string} fcmToken - Device FCM token
+ * @param {string} pushToken - Expo push token
  * @param {object} notification - { title, body, imageUrl? }
  * @param {object} data - Custom data payload
  */
-const sendToDevice = async (fcmToken, notification, data = {}) => {
-  if (!firebaseInitialized) {
-    console.log("[FCM Mock] sendToDevice:", { fcmToken, notification, data });
-    return { success: true, mock: true };
+const sendToDevice = async (pushToken, notification, data = {}) => {
+  if (!pushToken) {
+    console.warn("[Push] No push token provided");
+    return { success: false, error: "No token" };
+  }
+
+  if (!Expo.isExpoPushToken(pushToken)) {
+    console.warn(
+      `[Push] Invalid Expo push token: ${pushToken?.substring(0, 30)}...`
+    );
+    return { success: false, error: "Invalid Expo push token" };
   }
 
   try {
     const message = {
-      token: fcmToken,
-      notification: {
-        title: notification.title,
-        body: notification.body,
-        ...(notification.imageUrl && { imageUrl: notification.imageUrl }),
-      },
+      to: pushToken,
+      sound: "default",
+      title: notification.title,
+      body: notification.body,
       data: Object.fromEntries(
         Object.entries(data).map(([k, v]) => [k, String(v)])
       ),
-      android: {
-        priority: "high",
-        notification: {
-          sound: "default",
-          clickAction: "FLUTTER_NOTIFICATION_CLICK",
-        },
-      },
-      apns: {
-        payload: {
-          aps: {
-            sound: "default",
-            badge: 1,
-          },
-        },
-      },
+      priority: "high",
+      channelId: "default",
     };
 
-    const response = await admin.messaging().send(message);
-    console.log("[FCM] Message sent successfully:", response);
-    return { success: true, messageId: response };
+    const chunks = expo.chunkPushNotifications([message]);
+    const tickets = [];
+
+    for (const chunk of chunks) {
+      const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+      tickets.push(...ticketChunk);
+    }
+
+    const ticket = tickets[0];
+    if (ticket.status === "ok") {
+      console.log("[Push] Message sent successfully:", ticket.id);
+      return { success: true, messageId: ticket.id };
+    } else {
+      console.error("[Push] Error in ticket:", ticket.message);
+      return { success: false, error: ticket.message };
+    }
   } catch (error) {
-    console.error("[FCM] Error sending message:", error.message);
+    console.error("[Push] Error sending message:", error.message);
     return { success: false, error: error.message };
   }
 };
 
 /**
  * Send push notification to multiple devices
- * @param {string[]} fcmTokens - Array of FCM tokens
+ * @param {string[]} pushTokens - Array of Expo push tokens
  * @param {object} notification - { title, body, imageUrl? }
  * @param {object} data - Custom data payload
  */
-const sendToMultipleDevices = async (fcmTokens, notification, data = {}) => {
-  if (!firebaseInitialized) {
-    console.log("[FCM Mock] sendToMultipleDevices:", {
-      count: fcmTokens.length,
-      notification,
-      data,
-    });
-    return { success: true, mock: true, successCount: fcmTokens.length };
-  }
-
-  if (!fcmTokens || fcmTokens.length === 0) {
+const sendToMultipleDevices = async (pushTokens, notification, data = {}) => {
+  if (!pushTokens || pushTokens.length === 0) {
     return { success: false, error: "No tokens provided" };
   }
 
+  // Filter to valid Expo push tokens only
+  const validTokens = pushTokens.filter((t) => Expo.isExpoPushToken(t));
+  if (validTokens.length === 0) {
+    console.warn("[Push] No valid Expo push tokens in batch");
+    return { success: false, error: "No valid tokens", successCount: 0, failureCount: pushTokens.length };
+  }
+
   try {
-    const message = {
-      notification: {
-        title: notification.title,
-        body: notification.body,
-        ...(notification.imageUrl && { imageUrl: notification.imageUrl }),
-      },
+    const messages = validTokens.map((token) => ({
+      to: token,
+      sound: "default",
+      title: notification.title,
+      body: notification.body,
       data: Object.fromEntries(
         Object.entries(data).map(([k, v]) => [k, String(v)])
       ),
-      android: {
-        priority: "high",
-        notification: {
-          sound: "default",
-        },
-      },
-      apns: {
-        payload: {
-          aps: {
-            sound: "default",
-          },
-        },
-      },
-      tokens: fcmTokens,
-    };
+      priority: "high",
+      channelId: "default",
+    }));
 
-    const response = await admin.messaging().sendEachForMulticast(message);
+    const chunks = expo.chunkPushNotifications(messages);
+    const tickets = [];
+
+    for (const chunk of chunks) {
+      const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+      tickets.push(...ticketChunk);
+    }
+
+    let successCount = 0;
+    let failureCount = 0;
+    for (const ticket of tickets) {
+      if (ticket.status === "ok") {
+        successCount++;
+      } else {
+        failureCount++;
+        console.error("[Push] Ticket error:", ticket.message);
+      }
+    }
+
     console.log(
-      `[FCM] Multicast: ${response.successCount} success, ${response.failureCount} failed`
+      `[Push] Multicast: ${successCount} success, ${failureCount} failed`
     );
 
     return {
-      success: true,
-      successCount: response.successCount,
-      failureCount: response.failureCount,
-      responses: response.responses,
+      success: successCount > 0,
+      successCount,
+      failureCount: failureCount + (pushTokens.length - validTokens.length),
+      responses: tickets,
     };
   } catch (error) {
-    console.error("[FCM] Error sending multicast:", error.message);
+    console.error("[Push] Error sending multicast:", error.message);
     return { success: false, error: error.message };
   }
 };
 
 /**
- * Send notification by topic
- * @param {string} topic - Topic name
- * @param {object} notification - { title, body }
- * @param {object} data - Custom data payload
+ * Send notification by topic (not supported by Expo – sends individually)
+ * Kept for interface compatibility; callers should prefer sendToMultipleDevices.
  */
-const sendToTopic = async (topic, notification, data = {}) => {
-  if (!firebaseInitialized) {
-    console.log("[FCM Mock] sendToTopic:", { topic, notification, data });
-    return { success: true, mock: true };
-  }
-
-  try {
-    const message = {
-      topic,
-      notification: {
-        title: notification.title,
-        body: notification.body,
-      },
-      data: Object.fromEntries(
-        Object.entries(data).map(([k, v]) => [k, String(v)])
-      ),
-    };
-
-    const response = await admin.messaging().send(message);
-    console.log("[FCM] Topic message sent:", response);
-    return { success: true, messageId: response };
-  } catch (error) {
-    console.error("[FCM] Error sending to topic:", error.message);
-    return { success: false, error: error.message };
-  }
+const sendToTopic = async (_topic, notification, data = {}) => {
+  console.warn(
+    "[Push] Topic-based sending not supported by Expo Push API. Use sendToMultipleDevices."
+  );
+  return { success: false, error: "Topics not supported with Expo Push" };
 };
 
 /**
- * Subscribe tokens to a topic
- * @param {string[]} tokens - FCM tokens
- * @param {string} topic - Topic name
+ * Subscribe / unsubscribe stubs (not applicable for Expo Push)
  */
-const subscribeToTopic = async (tokens, topic) => {
-  if (!firebaseInitialized) {
-    console.log("[FCM Mock] subscribeToTopic:", { tokens, topic });
-    return { success: true, mock: true };
-  }
-
-  try {
-    const response = await admin.messaging().subscribeToTopic(tokens, topic);
-    console.log("[FCM] Subscribed to topic:", response);
-    return {
-      success: true,
-      successCount: response.successCount,
-      failureCount: response.failureCount,
-    };
-  } catch (error) {
-    console.error("[FCM] Error subscribing to topic:", error.message);
-    return { success: false, error: error.message };
-  }
+const subscribeToTopic = async (_tokens, _topic) => {
+  console.warn("[Push] Topic subscriptions not supported by Expo Push API.");
+  return { success: false, error: "Topics not supported" };
 };
 
-/**
- * Unsubscribe tokens from a topic
- * @param {string[]} tokens - FCM tokens
- * @param {string} topic - Topic name
- */
-const unsubscribeFromTopic = async (tokens, topic) => {
-  if (!firebaseInitialized) {
-    console.log("[FCM Mock] unsubscribeFromTopic:", { tokens, topic });
-    return { success: true, mock: true };
-  }
-
-  try {
-    const response = await admin
-      .messaging()
-      .unsubscribeFromTopic(tokens, topic);
-    console.log("[FCM] Unsubscribed from topic:", response);
-    return {
-      success: true,
-      successCount: response.successCount,
-      failureCount: response.failureCount,
-    };
-  } catch (error) {
-    console.error("[FCM] Error unsubscribing from topic:", error.message);
-    return { success: false, error: error.message };
-  }
+const unsubscribeFromTopic = async (_tokens, _topic) => {
+  console.warn("[Push] Topic subscriptions not supported by Expo Push API.");
+  return { success: false, error: "Topics not supported" };
 };
 
 // ============ Application-specific notification helpers ============
@@ -403,9 +317,8 @@ const notifyNewAppointment = async (adminTokens, appointment) => {
     adminTokens,
     {
       title: "New Appointment",
-      body: `New booking for ${
-        appointment.vehicleSnapshot?.brand || "Vehicle"
-      }`,
+      body: `New booking for ${appointment.vehicleSnapshot?.brand || "Vehicle"
+        }`,
     },
     {
       type: "NEW_APPOINTMENT",

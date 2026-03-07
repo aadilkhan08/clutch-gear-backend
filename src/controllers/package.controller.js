@@ -3,6 +3,7 @@
  * Admin package management operations
  */
 const { Package, Subscription, Service } = require("../models");
+const { imagekitService } = require("../services");
 const {
   ApiResponse,
   ApiError,
@@ -280,6 +281,13 @@ const deletePackage = asyncHandler(async (req, res) => {
   }
 
   await Package.findByIdAndDelete(pkg._id);
+
+  // Clean up ImageKit file
+  if (pkg.image?.fileId) {
+    imagekitService.deleteImage(pkg.image.fileId).catch((err) =>
+      console.error("ImageKit cleanup (package image):", err.message)
+    );
+  }
 
   return ApiResponse.success(res, "Package deleted successfully", null);
 });

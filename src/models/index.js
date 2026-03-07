@@ -42,6 +42,10 @@ const VehicleCatalog = require("./vehicleCatalog.model");
 // Partners
 const Partner = require("./partner.model");
 
+// Banner & Testimonials
+const Banner = require("./banner.model");
+const Testimonial = require("./testimonial.model");
+
 module.exports = {
   User,
   OTP,
@@ -76,4 +80,7 @@ module.exports = {
   VehicleCatalog,
   // Partners
   Partner,
+  // Banner & Testimonials
+  Banner,
+  Testimonial,
 };

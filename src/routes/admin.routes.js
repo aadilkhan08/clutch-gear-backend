@@ -22,6 +22,8 @@ const {
   invoiceController,
   promotionController,
   partnerController,
+  bannerController,
+  testimonialController,
 } = require("../controllers");
 const {
   authenticate,
@@ -74,6 +76,13 @@ const {
   createPartnerValidation,
   updatePartnerValidation,
   listPartnerValidation,
+  createMechanicValidation,
+  createBannerValidation,
+  updateBannerValidation,
+  listBannerValidation,
+  createTestimonialValidation,
+  updateTestimonialValidation,
+  listTestimonialValidation,
 } = require("../validators");
 
 // Image upload config
@@ -185,6 +194,12 @@ router.get(
 
 // Mechanic role management (admin-controlled)
 router.get("/mechanics", adminController.listMechanics);
+router.post(
+  "/mechanics",
+  createMechanicValidation,
+  validate,
+  adminController.createMechanic,
+);
 router.get(
   "/mechanics/:id",
   validateObjectId("id"),
@@ -720,6 +735,78 @@ router.delete(
   "/partners/:id",
   validateObjectId("id"),
   partnerController.deletePartner,
+);
+
+// ============ Banner Management ============
+router.get(
+  "/banners",
+  listBannerValidation,
+  validate,
+  bannerController.listBanners,
+);
+router.get(
+  "/banners/:id",
+  validateObjectId("id"),
+  bannerController.getBanner,
+);
+router.post(
+  "/banners",
+  createBannerValidation,
+  validate,
+  bannerController.createBanner,
+);
+router.put(
+  "/banners/:id",
+  validateObjectId("id"),
+  updateBannerValidation,
+  validate,
+  bannerController.updateBanner,
+);
+router.put(
+  "/banners/:id/toggle",
+  validateObjectId("id"),
+  bannerController.toggleBanner,
+);
+router.delete(
+  "/banners/:id",
+  validateObjectId("id"),
+  bannerController.deleteBanner,
+);
+
+// ============ Testimonial Management ============
+router.get(
+  "/testimonials",
+  listTestimonialValidation,
+  validate,
+  testimonialController.listTestimonials,
+);
+router.get(
+  "/testimonials/:id",
+  validateObjectId("id"),
+  testimonialController.getTestimonial,
+);
+router.post(
+  "/testimonials",
+  createTestimonialValidation,
+  validate,
+  testimonialController.createTestimonial,
+);
+router.put(
+  "/testimonials/:id",
+  validateObjectId("id"),
+  updateTestimonialValidation,
+  validate,
+  testimonialController.updateTestimonial,
+);
+router.put(
+  "/testimonials/:id/toggle",
+  validateObjectId("id"),
+  testimonialController.toggleTestimonial,
+);
+router.delete(
+  "/testimonials/:id",
+  validateObjectId("id"),
+  testimonialController.deleteTestimonial,
 );
 
 module.exports = router;

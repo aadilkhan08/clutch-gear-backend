@@ -1144,9 +1144,8 @@ exports.initializeDailyWash = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Initialized ${newEntries.length} wash entries for ${
-        targetDate.toISOString().split("T")[0]
-      }`,
+      message: `Initialized ${newEntries.length} wash entries for ${targetDate.toISOString().split("T")[0]
+        }`,
       data: { created: newEntries.length, total: vehicles.length },
     });
   } catch (error) {
@@ -1183,14 +1182,19 @@ exports.assignVehicleToZone = async (req, res) => {
           message: "Zone not found",
         });
       }
+
+      // Capture old zone before overwriting
+      const oldZoneId = vehicle.washZone ? vehicle.washZone.toString() : null;
       vehicle.washZone = zoneId;
 
-      // Update zone vehicle count
-      await Zone.findByIdAndUpdate(zoneId, { $inc: { vehicleCount: 1 } });
-      if (vehicle.washZone && vehicle.washZone.toString() !== zoneId) {
-        await Zone.findByIdAndUpdate(vehicle.washZone, {
-          $inc: { vehicleCount: -1 },
-        });
+      // Update zone vehicle counts
+      if (oldZoneId !== zoneId) {
+        await Zone.findByIdAndUpdate(zoneId, { $inc: { vehicleCount: 1 } });
+        if (oldZoneId) {
+          await Zone.findByIdAndUpdate(oldZoneId, {
+            $inc: { vehicleCount: -1 },
+          });
+        }
       }
     }
 
@@ -1202,14 +1206,19 @@ exports.assignVehicleToZone = async (req, res) => {
           message: "Area not found",
         });
       }
+
+      // Capture old area before overwriting
+      const oldAreaId = vehicle.washArea ? vehicle.washArea.toString() : null;
       vehicle.washArea = areaId;
 
-      // Update area vehicle count
-      await Area.findByIdAndUpdate(areaId, { $inc: { vehicleCount: 1 } });
-      if (vehicle.washArea && vehicle.washArea.toString() !== areaId) {
-        await Area.findByIdAndUpdate(vehicle.washArea, {
-          $inc: { vehicleCount: -1 },
-        });
+      // Update area vehicle counts
+      if (oldAreaId !== areaId) {
+        await Area.findByIdAndUpdate(areaId, { $inc: { vehicleCount: 1 } });
+        if (oldAreaId) {
+          await Area.findByIdAndUpdate(oldAreaId, {
+            $inc: { vehicleCount: -1 },
+          });
+        }
       }
     }
 
@@ -1447,8 +1456,8 @@ exports.getCustomerWashSummary = async (req, res) => {
     const washRate =
       totalRecords > 0
         ? Math.round(
-            (statusCounts.washed / (totalRecords - statusCounts.holiday)) * 100
-          )
+          (statusCounts.washed / (totalRecords - statusCounts.holiday)) * 100
+        )
         : 0;
 
     res.json({

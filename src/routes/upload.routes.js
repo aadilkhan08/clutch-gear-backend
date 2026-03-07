@@ -19,6 +19,18 @@ const upload = multer({
   },
 });
 
+const videoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith("video/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only video files are allowed"), false);
+    }
+  },
+});
+
 // All routes require authentication
 router.use(authenticate);
 
@@ -30,6 +42,7 @@ router.post(
   upload.array("images", 10),
   uploadController.uploadImages
 );
+router.post("/video", videoUpload.single("video"), uploadController.uploadVideo);
 router.delete("/:fileId", uploadController.deleteImage);
 
 module.exports = router;

@@ -3,6 +3,7 @@
  * Admin CRUD + public listing for customer banners
  */
 const { Promotion } = require("../models");
+const { imagekitService } = require("../services");
 const {
     ApiResponse,
     ApiError,
@@ -95,6 +96,14 @@ const updatePromotion = asyncHandler(async (req, res) => {
     const promotion = await Promotion.findById(req.params.id);
     if (!promotion) throw ApiError.notFound("Promotion not found");
 
+    // If bannerImage is being replaced, clean up old one from ImageKit
+    if (req.body.bannerImage && req.body.bannerImage.fileId && promotion.bannerImage?.fileId
+        && req.body.bannerImage.fileId !== promotion.bannerImage.fileId) {
+        imagekitService.deleteImage(promotion.bannerImage.fileId).catch((err) =>
+            console.error("ImageKit cleanup (old promotion banner):", err.message)
+        );
+    }
+
     const allowedFields = [
         "title",
         "description",
@@ -125,6 +134,14 @@ const updatePromotion = asyncHandler(async (req, res) => {
 const deletePromotion = asyncHandler(async (req, res) => {
     const promotion = await Promotion.findById(req.params.id);
     if (!promotion) throw ApiError.notFound("Promotion not found");
+
+    // Clean up ImageKit file
+    if (promotion.bannerImage?.fileId) {
+        imagekitService.deleteImage(promotion.bannerImage.fileId).catch((err) =>
+            console.error("ImageKit cleanup (promotion banner):", err.message)
+        );
+    }
+
     await promotion.deleteOne();
     ApiResponse.success(res, "Promotion deleted");
 });

@@ -111,7 +111,7 @@ const uploadVideo = async (file, fileName, folder = "videos") => {
       success: true,
       url: response.url,
       fileId: response.fileId,
-      thumbnailUrl: response.thumbnailUrl,
+      thumbnailUrl: response.thumbnailUrl || (response.url ? response.url + '/ik-thumbnail.jpg' : null),
       name: response.name,
       size: response.size,
       fileType: response.fileType,

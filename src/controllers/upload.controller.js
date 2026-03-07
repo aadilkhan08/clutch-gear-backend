@@ -66,9 +66,31 @@ const deleteImage = asyncHandler(async (req, res) => {
   ApiResponse.success(res, "Image deleted successfully");
 });
 
+/**
+ * @desc    Upload single video
+ * @route   POST /api/v1/upload/video
+ * @access  Private
+ */
+const uploadVideo = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw ApiError.badRequest("Please upload a video");
+  }
+
+  const { folder = "videos" } = req.body;
+
+  const result = await imagekitService.uploadVideo(
+    req.file.buffer,
+    req.file.originalname,
+    folder
+  );
+
+  ApiResponse.success(res, "Video uploaded successfully", result);
+});
+
 module.exports = {
   getUploadAuth,
   uploadImage,
   uploadImages,
+  uploadVideo,
   deleteImage,
 };

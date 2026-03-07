@@ -3,6 +3,7 @@
  * Admin CRUD + public listing for partnership banners
  */
 const { Partner } = require("../models");
+const { imagekitService } = require("../services");
 const {
     ApiResponse,
     ApiError,
@@ -75,6 +76,14 @@ const updatePartner = asyncHandler(async (req, res) => {
     const partner = await Partner.findById(req.params.id);
     if (!partner) throw ApiError.notFound("Partner not found");
 
+    // If logo is being replaced, clean up old one from ImageKit
+    if (req.body.logo && req.body.logo.fileId && partner.logo?.fileId
+        && req.body.logo.fileId !== partner.logo.fileId) {
+        imagekitService.deleteImage(partner.logo.fileId).catch((err) =>
+            console.error("ImageKit cleanup (old partner logo):", err.message)
+        );
+    }
+
     const allowedFields = [
         "name",
         "subtitle",
@@ -98,6 +107,14 @@ const updatePartner = asyncHandler(async (req, res) => {
 const deletePartner = asyncHandler(async (req, res) => {
     const partner = await Partner.findById(req.params.id);
     if (!partner) throw ApiError.notFound("Partner not found");
+
+    // Clean up ImageKit file
+    if (partner.logo?.fileId) {
+        imagekitService.deleteImage(partner.logo.fileId).catch((err) =>
+            console.error("ImageKit cleanup (partner logo):", err.message)
+        );
+    }
+
     await partner.deleteOne();
     ApiResponse.success(res, "Partner deleted");
 });

@@ -24,9 +24,10 @@ const computeStatus = (payment) => {
 const getEffectiveDate = (payment) => payment.updatedAt || payment.createdAt;
 
 const adminDashboard = asyncHandler(async (req, res) => {
-  const today = new Date();
-  const start = new Date(today.setHours(0, 0, 0, 0));
-  const end = new Date(today.setHours(23, 59, 59, 999));
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
 
   const [todayPayments, partialCount, refundPending, paidCount, refundedCount] =
     await Promise.all([
@@ -266,7 +267,13 @@ const processRefund = asyncHandler(async (req, res) => {
     0
   );
   computeStatus(payment);
-  if (payment.paidAmount === 0) payment.paymentStatus = "REFUNDED";
+  if (payment.paidAmount === 0) {
+    payment.paymentStatus = "REFUNDED";
+    payment.status = "refunded";
+  } else {
+    // Partial refund — payment is no longer fully completed
+    payment.status = "pending";
+  }
   await payment.save();
 
   refund.status = "PROCESSED";
@@ -321,6 +328,20 @@ const listMyRefunds = asyncHandler(async (req, res) => {
   );
 });
 
+const getMyRefund = asyncHandler(async (req, res) => {
+  const refund = await RefundRequest.findOne({
+    _id: req.params.id,
+    customerId: req.userId,
+  })
+    .populate("paymentId")
+    .populate("invoiceId", "jobNumber vehicleSnapshot")
+    .lean();
+
+  if (!refund) throw ApiError.notFound("Refund request not found");
+
+  ApiResponse.success(res, "Refund fetched", refund);
+});
+
 module.exports = {
   adminDashboard,
   listAdminPayments,
@@ -334,4 +355,5 @@ module.exports = {
   processRefund,
   listMyPayments,
   listMyRefunds,
+  getMyRefund,
 };
